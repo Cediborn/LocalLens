@@ -423,6 +423,8 @@ async def recommend(body: dict):
         results.append({
             "name": place["name"],
             "category": place["category"],
+            "lat": place.get("lat"),
+            "lon": place.get("lon"),
             "distance_km": r.distance_km,
             "estimated_time_hours": r.est_time,
             "cost_estimate": r.cost_estimate,
@@ -558,10 +560,18 @@ async def refine(body: dict):
             refined_results.append({
                 "name": r.place["name"],
                 "category": r.place["category"],
+                "lat": r.place.get("lat"),
+                "lon": r.place.get("lon"),
                 "distance_km": r.distance_km,
                 "estimated_time_hours": r.est_time,
                 "cost_estimate": r.cost_estimate,
                 "opening_hours": r.place["tags"].get("opening_hours", "Unknown"),
+                "address": r.place["tags"].get("addr:full")
+                           or r.place["tags"].get("addr:street")
+                           or r.place["tags"].get("address")
+                           or "Location only",
+                "phone": r.place["tags"].get("phone"),
+                "website": r.place["tags"].get("website"),
                 "why_it_matches": r.why,
                 "score": r.score,
                 "breakdown": r.breakdown,
@@ -739,10 +749,15 @@ async def refine(body: dict):
         adjusted.append({
             "name": pr.get("name"),
             "category": pr.get("category"),
+            "lat": pr.get("lat"),
+            "lon": pr.get("lon"),
             "distance_km": pr.get("distance_km"),
             "estimated_time_hours": pr.get("estimated_time_hours"),
             "cost_estimate": pr.get("cost_estimate"),
             "opening_hours": pr.get("opening_hours"),
+            "address": pr.get("address", "Location only"),
+            "phone": pr.get("phone"),
+            "website": pr.get("website"),
             "why_it_matches": pr.get("why_it_matches", ""),
             "score": round(new_score, 1),
             "original_score": round(orig_score, 1),
