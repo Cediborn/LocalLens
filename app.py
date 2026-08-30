@@ -103,7 +103,7 @@ def _check_rate_limit(client_ip: str) -> bool:
 
 async def _http_get(url: str, params: dict = None, headers: dict = None, timeout: float = 30.0):
     headers = headers or {}
-    headers.setdefault("User-User-Agent", USER_AGENT)
+    headers.setdefault("User-Agent", USER_AGENT)
 
     async with httpx.AsyncClient(timeout=timeout) as client:
         for attempt in range(3):
