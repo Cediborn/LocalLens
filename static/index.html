@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LocalLens — What can I do right now?</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232734;
+    --border: #2d3140;
+    --text: #e1e3eb;
+    --text-muted: #8b8fa3;
+    --accent: #6c8cff;
+    --accent-glow: rgba(108, 140, 255, 0.25);
+    --green: #3ecf8e;
+    --yellow: #f0b90b;
+    --red: #f05757;
+    --radius: 10px;
+    --shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    color: #fff;
+  }
+  .logo span { color: var(--accent); }
+  .header-tagline {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: auto;
+  }
+
+  /* ── Layout ── */
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 16px 40px;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .hero h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero p {
+    color: var(--text-muted);
+    font-size: 14px;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 {
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  /* ── Form ── */
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 600px) {
+    .form-grid { grid-template-columns: 1fr; }
+  }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field.full { grid-column: 1 / -1; }
+
+  label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+  label .hint {
+    color: #5a5f73;
+    font-weight: normal;
+    font-size: 11px;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  input[type="time"],
+  select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+  }
+  input:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  input::placeholder { color: #4a4e62; }
+
+  .checkbox-group {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  .checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .checkbox-item input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 15px;
+    height: 15px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+    width: 100%;
+    margin-top: 8px;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px var(--accent-glow); }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--border); }
+
+  .btn-small {
+    padding: 8px 14px;
+    font-size: 12px;
+    width: auto;
+  }
+
+  /* ── Results ── */
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .results-count {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .results-count strong { color: var(--text); }
+
+  .confidence-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .confidence-verified { background: rgba(62, 207, 142, 0.15); color: var(--green); border: 1px solid rgba(62, 207, 142, 0.3); }
+  .confidence-estimated { background: rgba(240, 185, 11, 0.15); color: var(--yellow); border: 1px solid rgba(240, 185, 11, 0.3); }
+  .confidence-unknown { background: rgba(139, 143, 163, 0.15); color: var(--text-muted); border: 1px solid rgba(139, 143, 163, 0.3); }
+
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 0.2s;
+  }
+  .result-card:hover { border-color: #3d4257; }
+
+  .result-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .result-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .result-category {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: var(--surface2);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  .result-score {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+  }
+  .score-ring {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+  }
+  .score-ring.high { border-color: var(--green); color: var(--green); }
+  .score-ring.medium { border-color: var(--yellow); color: var(--yellow); }
+  .score-ring.low { border-color: var(--red); color: var(--red); }
+
+  .result-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .result-details .detail {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .result-details .detail .label { color: #5a5f73; }
+  .result-details .detail .value { color: var(--text); }
+
+  .result-why {
+    font-size: 13px;
+    color: var(--text);
+    background: var(--surface2);
+    border-left: 3px solid var(--accent);
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    line-height: 1.5;
+    margin-top: 4px;
+  }
+
+  .result-source {
+    font-size: 11px;
+    color: #5a5f73;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .result-source .badge {
+    background: var(--surface2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
+  /* ── Refinement bar ── */
+  .refinement-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .refinement-input {
+    flex: 1;
+    min-width: 200px;
+  }
+  .refinement-input input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .refinement-input input:focus { border-color: var(--accent); }
+
+  .quick-refinements {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .quick-pill {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .quick-pill:hover { border-color: var(--accent); color: var(--text); background: var(--border); }
+
+  /* ── Loading ── */
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px;
+    gap: 10px;
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+  .spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Error ── */
+  .error-box {
+    background: rgba(240, 87, 87, 0.1);
+    border: 1px solid rgba(240, 87, 87, 0.3);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    color: var(--red);
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+
+  /* ── Empty ── */
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+  }
+  .empty-state h3 { font-size: 16px; color: var(--text); margin-bottom: 8px; }
+  .empty-state p { font-size: 13px; max-width: 380px; margin: 0 auto 16px; }
+
+  /* ── Score breakdown ── */
+  .breakdown {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .breakdown-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .breakdown-bar {
+    width: 60px;
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .breakdown-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+  }
+
+  /* ── Coverage note ── */
+  .coverage-note {
+    font-size: 12px;
+    color: var(--text-muted);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-top: 12px;
+    line-height: 1.5;
+  }
+
+  /* ── Intro splash ── */
+  .intro-splash {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px 24px;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  .intro-splash h2 {
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    text-align: left;
+  }
+  .intro-splash p {
+    font-size: 15px;
+    color: var(--text);
+    max-width: 600px;
+    margin: 0 auto 20px;
+    line-height: 1.6;
+  }
+  .intro-splash p strong { color: var(--accent); }
+
+  /* ── Scoring model reference ── */
+  .scoring-ref {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .scoring-ref summary {
+    cursor: pointer;
+    color: var(--accent);
+    font-weight: 500;
+    user-select: none;
+    margin-bottom: 6px;
+  }
+  .scoring-ref table { width: 100%; margin-top: 8px; border-collapse: collapse; }
+  .scoring-ref th, .scoring-ref td {
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .scoring-ref th { color: #5a5f73; font-weight: 500; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border); }
+
+  /* ── Utility ── */
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">Local<span>Lens</span></div>
+  <div class="header-tagline">Real local discovery · Powered by OpenStreetMap</div>
+</header>
+
+<div class="container" id="app">
+  <!-- Intro / splash screen -->
+  <div id="splash" class="intro-splash">
+    <h2>What can I do right now?</h2>
+    <p>
+      Tell <strong>LocalLens</strong> where you are, what you have to spend, and what you're in the mood for.
+      It finds <strong>real places</strong> near you — cafes, parks, museums, bars, libraries, shops, and more —
+      all from <strong>OpenStreetMap</strong>, the world's free and open map.
+    </p>
+    <p style="font-size:13px; color:var(--text-muted);">
+      Every result shows <strong>why it was ranked</strong> where it was —
+      distance, budget, time, interests, and whether it suits you alone or with others.
+      Results are marked as <span style="color:var(--green)">verified</span> (from map data),
+      <span style="color:var(--yellow)">estimated</span> (derived), or <span style="color:var(--text-muted)">unknown</span>.
+    </p>
+  </div>
+
+  <!-- Search form -->
+  <div id="searchForm" class="card">
+    <h2>Where are you and what do you have?</h2>
+    <div class="form-grid">
+      <div class="field full">
+        <label for="location">Location <span class="hint">— city, neighbourhood, or address</span></label>
+        <input type="text" id="location" placeholder="e.g. Accra, Ghana / Shoreditch, London / Downtown LA" autocomplete="off">
+      </div>
+
+      <div class="field">
+        <label for="budget">Budget <span class="hint">— how much you're willing to spend</span></label>
+        <input type="number" id="budget" placeholder="100" min="0" step="1">
+      </div>
+
+      <div class="field">
+        <label for="budgetCurrency">Currency</label>
+        <select id="budgetCurrency">
+          <option value="USD">USD ($)</option>
+          <option value="EUR">EUR (€)</option>
+          <option value="GBP">GBP (£)</option>
+          <option value="GHS">GHS (GH₵)</option>
+          <option value="NGN">NGN (₦)</option>
+          <option value="KES">KES (KSh)</option>
+          <option value="ZAR">ZAR (R)</option>
+          <option value="AUD">AUD (A$)</option>
+          <option value="CAD">CAD (C$)</option>
+          <option value="INR">INR (₹)</option>
+          <option value="JPY">JPY (¥)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="timeAvailable">Time available <span class="hint">— hours free</span></label>
+        <input type="number" id="timeAvailable" placeholder="3" min="0.5" step="0.5">
+      </div>
+
+      <div class="field">
+        <label for="maxDistance">Max distance <span class="hint">— km you're willing to travel</span></label>
+        <input type="number" id="maxDistance" placeholder="5" min="0.5" step="0.5">
+      </div>
+
+      <div class="field full">
+        <label>Interests <span class="hint">— tap what you're in the mood for (multiple ok)</span></label>
+        <div class="checkbox-group" id="interestsContainer">
+          <label class="checkbox-item"><input type="checkbox" value="food" checked> Food</label>
+          <label class="checkbox-item"><input type="checkbox" value="drinks"> Drinks</label>
+          <label class="checkbox-item"><input type="checkbox" value="culture"> Culture</label>
+          <label class="checkbox-item"><input type="checkbox" value="art"> Art</label>
+          <label class="checkbox-item"><input type="checkbox" value="music"> Music</label>
+          <label class="checkbox-item"><input type="checkbox" value="history"> History</label>
+          <label class="checkbox-item"><input type="checkbox" value="outdoors"> Outdoors</label>
+          <label class="checkbox-item"><input type="checkbox" value="nature"> Nature</label>
+          <label class="checkbox-item"><input type="checkbox" value="sports"> Sports</label>
+          <label class="checkbox-item"><input type="checkbox" value="shopping"> Shopping</label>
+          <label class="checkbox-item"><input type="checkbox" value="party"> Party</label>
+          <label class="checkbox-item"><input type="checkbox" value="relax"> Relax</label>
+          <label class="checkbox-item"><input type="checkbox" value="learning"> Learning</label>
+          <label class="checkbox-item"><input type="checkbox" value="family"> Family</label>
+          <label class="checkbox-item"><input type="checkbox" value="nightlife"> Nightlife</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Going alone?</label>
+        <div style="display:flex; gap:8px;">
+          <label class="checkbox-item" style="flex:1; justify-content:center;">
+            <input type="radio" name="alone" value="true" checked> Yes, solo
+          </label>
+          <label class="checkbox-item" style="flex:1; justify-content:center;">
+            <input type="radio" name="alone" value="false"> With others
+          </label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="startTime">Available from <span class="hint">— optional</span></label>
+        <input type="time" id="startTime">
+      </div>
+    </div>
+
+    <button class="btn" id="searchBtn">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="opacity:0.8;">
+        <path d="M8 1a7 7 0 100 14A7 7 0 008 1zM7 5l-.7 4h4.6l-.7-4M11 8h2v4h-2z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Find things to do
+    </button>
+  </div>
+
+  <!-- Results area -->
+  <div id="resultsArea" class="hidden">
+    <div class="card">
+      <div class="results-header">
+        <div class="results-count" id="resultsCount"></div>
+        <button class="btn btn-secondary btn-small" id="clearResultsBtn" style="margin:0;">Clear</button>
+      </div>
+      <div id="resultsList"></div>
+      <div id="coverageNote" class="coverage-note hidden"></div>
+    </div>
+
+    <!-- Refinement bar -->
+    <div id="refinementSection" class="card">
+      <h2 style="margin-bottom:10px;">Refine the results</h2>
+      <div class="refinement-bar">
+        <div class="refinement-input">
+          <input type="text" id="refinementInput" placeholder="Try: &quot;Make it cheaper&quot; or &quot;Nothing involving food&quot; or &quot;After 8pm&quot; or &quot;Top 3&quot;" autocomplete="off">
+        </div>
+        <button class="btn btn-secondary btn-small" id="refineBtn" style="margin:0; width:auto;">Refine</button>
+      </div>
+      <div class="quick-refinements">
+        <span class="quick-pill" data-refine="Make it cheaper.">Cheaper</span>
+        <span class="quick-pill" data-refine="Nothing involving food.">No food</span>
+        <span class="quick-pill" data-refine="Something I can do after 8pm.">After 8pm</span>
+        <span class="quick-pill" data-refine="I'm willing to travel farther.">Go farther</span>
+        <span class="quick-pill" data-refine="Give me your top 3.">Top 3</span>
+        <span class="quick-pill" data-refine="Something more cultural.">More cultural</span>
+        <span class="quick-pill" data-refine="Something outdoors.">Outdoors</span>
+        <span class="quick-pill" data-refine="Something quick, under an hour.">Quick</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading" class="hidden loading">
+    <div class="spinner"></div>
+    <span>Searching OpenStreetMap for places near you...</span>
+  </div>
+
+  <!-- Error -->
+  <div id="errorBox" class="hidden error-box"></div>
+
+  <!-- Scoring reference -->
+  <details class="scoring-ref" id="scoringRef">
+    <summary>How the scoring works</summary>
+    <table>
+      <tr><th>Factor</th><th>Weight</th><th>What it means</th></tr>
+      <tr><td>Distance</td><td>20%</td><td>Closer places score higher. Degrades linearly with distance.</td></tr>
+      <tr><td>Budget</td><td>25%</td><td>How well the estimated cost fits your budget. Under 50% of budget = full marks.</td></tr>
+      <tr><td>Time fit</td><td>20%</td><td>Estimated duration vs your available time. Fits comfortably = full marks.</td></tr>
+      <tr><td>Interests</td><td>25%</td><td>Direct category match + keyword match against your selected interests.</td></tr>
+      <tr><td>Companion</td><td>10%</td><td>Solo-friendly vs group-friendly categories, matched to your situation.</td></tr>
+    </table>
+    <p style="margin-top:8px;"><strong>Confidence levels:</strong></p>
+    <table>
+      <tr><th>Tier</th><th>Meaning</th></tr>
+      <tr><td style="color:var(--green);">✓ Verified</td><td>Name, location, and category from OpenStreetMap data directly.</td></tr>
+      <tr><td style="color:var(--yellow);">○ Estimated</td><td>Cost tier or other info derived from typical values (no price data in OSM).</td></tr>
+      <tr><td style="color:var(--text-muted);">? Unknown</td><td>Insufficient data — treat as a rough suggestion.</td></tr>
+    </table>
+  </details>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const API = '/api';
+
+  // ── State ──
+  let lastResults = [];
+  let lastQuery = null;
+
+  // ── DOM refs ──
+  const $ = id => document.getElementById(id);
+  const splash = $('splash');
+  const searchForm = $('searchForm');
+  const searchBtn = $('searchBtn');
+  const location = $('location');
+  const budget = $('budget');
+  const budgetCurrency = $('budgetCurrency');
+  const timeAvailable = $('timeAvailable');
+  const maxDistance = $('maxDistance');
+  const startTime = $('startTime');
+  const interestsContainer = $('interestsContainer');
+  const resultsArea = $('resultsArea');
+  const resultsList = $('resultsList');
+  const resultsCount = $('resultsCount');
+  const coverageNote = $('coverageNote');
+  const loading = $('loading');
+  const errorBox = $('errorBox');
+  const refineInput = $('refinementInput');
+  const refineBtn = $('refineBtn');
+  const clearResultsBtn = $('clearResultsBtn');
+  const scoringRef = $('scoringRef');
+
+  // ── Helpers ──
+  function getInterests() {
+    return Array.from(interestsContainer.querySelectorAll('input[type=checkbox]:checked'))
+      .map(cb => cb.value);
+  }
+
+  function getAlone() {
+    const checked = interestsContainer.closest('.form-grid')
+      .querySelector('input[name=alone]:checked');
+    return checked ? checked.value === 'true' : true;
+  }
+
+  function showLoading(show) {
+    loading.classList.toggle('hidden', !show);
+    searchBtn.disabled = show;
+  }
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.remove('hidden');
+    loading.classList.add('hidden');
+    searchBtn.disabled = false;
+  }
+
+  function hideError() {
+    errorBox.classList.add('hidden');
+  }
+
+  function formatScore(score) {
+    if (score >= 7.5) return 'high';
+    if (score >= 4.5) return 'medium';
+    return 'low';
+  }
+
+  function fmtDistance(km) {
+    if (km < 0.1) return Math.round(km * 1000) + ' m';
+    if (km < 1.0) return Math.round(km * 1000) + ' m';
+    return km.toFixed(1) + ' km';
+  }
+
+  function fmtTime(hours) {
+    if (hours <= 0.25) return '≤ 15 min';
+    if (hours <= 0.5) return '~30 min';
+    if (hours <= 1.0) return '~1 h';
+    if (hours <= 2.0) return '~2 h';
+    return Math.round(hours) + ' h+';
+  }
+
+  function fmtCost(est) {
+    if (!est || est.amount === undefined) return 'Unknown cost';
+    const { amount, currency, tier } = est;
+    const symbols = { USD: '$', EUR: '€', GBP: '£', GHS: 'GH₵', NGN: '₦', KES: 'KSh',
+                      ZAR: 'R', AUD: 'A$', CAD: 'C$', INR: '₹', JPY: '¥' };
+    const sym = symbols[currency] || currency + ' ';
+    if (tier === 'free') return 'Free';
+    return sym + Math.round(amount);
+  }
+
+  function confidenceClass(confidence) {
+    if (confidence === 'verified') return 'confidence-verified';
+    if (confidence === 'estimated') return 'confidence-estimated';
+    return 'confidence-unknown';
+  }
+
+  function confidenceLabel(confidence) {
+    if (confidence === 'verified') return '✓ Verified';
+    if (confidence === 'estimated') return '○ Estimated';
+    return '? Unknown';
+  }
+
+  function formatOpeningHours(hours) {
+    if (!hours || hours === 'Unknown' || hours === '') return 'Hours not listed';
+    // Trim long strings
+    if (hours.length > 80) return hours.substring(0, 77) + '...';
+    return hours;
+  }
+
+  // ── Render results ──
+  function renderResults(results, query) {
+    if (!results || results.length === 0) {
+      resultsList.innerHTML = `
+        <div class="empty-state">
+          <h3>No results found</h3>
+          <p>OpenStreetMap didn't have places matching your criteria in this area.</p>
+          <p style="font-size:12px;">Try a larger city, broader interests, or a wider search radius.</p>
+        </div>`;
+      resultsCount.textContent = '0 results';
+      coverageNote.classList.add('hidden');
+      return;
+    }
+
+    const topScore = results[0].score;
+
+    let html = '';
+    results.forEach((r, i) => {
+      const scoreClass = formatScore(r.score);
+      const isTop = (i === 0);
+      const rowNum = i + 1;
+      const rankLabel = isTop ? 'Best match' : `#${rowNum}`;
+
+      html += `
+        <div class="result-card" style="${isTop ? 'border-color: var(--accent);' : ''}">
+          <div class="result-top">
+            <div style="display:flex; align-items:flex-start; gap:10px; flex:1;">
+              <div class="score-ring ${scoreClass}" title="${rankLabel}">
+                ${isTop ? '★' : rowNum}
+              </div>
+              <div>
+                <div class="result-name">${escapeHtml(r.name)}</div>
+                <div>
+                  <span class="result-category">${escapeHtml(r.category)}</span>
+                  <span class="confidence-badge ${confidenceClass(r.confidence)}" style="margin-left:8px;">
+                    ${confidenceLabel(r.confidence)}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="result-score">
+              <div class="score-ring ${scoreClass}">
+                ${r.score.toFixed(1)}
+              </div>
+            </div>
+          </div>
+
+          <div class="result-details">
+            <div class="detail">
+              <span class="label">📍</span>
+              <span class="value">${fmtDistance(r.distance_km)}</span>
+            </div>
+            <div class="detail">
+              <span class="label">⏱</span>
+              <span class="value">${fmtTime(r.estimated_time_hours)}</span>
+            </div>
+            <div class="detail">
+              <span class="label">💰</span>
+              <span class="value">${fmtCost(r.cost_estimate)}</span>
+            </div>
+            <div class="detail">
+              <span class="label">🕐</span>
+              <span class="value">${formatOpeningHours(r.opening_hours)}</span>
+            </div>
+          </div>
+
+          <div class="result-why">
+            ${escapeHtml(r.why_it_matches)}
+          </div>
+
+          <div class="breakdown">
+            <div class="breakdown-item">
+              <span>Distance</span>
+              <div class="breakdown-bar"><div class="breakdown-fill" style="width:${(r.breakdown?.distance_score || 0) * 100}%"></div></div>
+              <span>${(r.breakdown?.distance_score || 0).toFixed(2)}</span>
+            </div>
+            <div class="breakdown-item">
+              <span>Budget</span>
+              <div class="breakdown-bar"><div class="breakdown-fill" style="width:${(r.breakdown?.budget_score || 0) * 100}%"></div></div>
+              <span>${(r.breakdown?.budget_score || 0).toFixed(2)}</span>
+            </div>
+            <div class="breakdown-item">
+              <span>Time</span>
+              <div class="breakdown-bar"><div class="breakdown-fill" style="width:${(r.breakdown?.time_score || 0) * 100}%"></div></div>
+              <span>${(r.breakdown?.time_score || 0).toFixed(2)}</span>
+            </div>
+            <div class="breakdown-item">
+              <span>Interests</span>
+              <div class="breakdown-bar"><div class="breakdown-fill" style="width:${(r.breakdown?.interest_score || 0) * 100}%"></div></div>
+              <span>${(r.breakdown?.interest_score || 0).toFixed(2)}</span>
+            </div>
+            <div class="breakdown-item">
+              <span>Companion</span>
+              <div class="breakdown-bar"><div class="breakdown-fill" style="width:${(r.breakdown?.companion_score || 0) * 100}%"></div></div>
+              <span>${(r.breakdown?.companion_score || 0).toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div class="result-source">
+            <span>Source:</span>
+            <span class="badge">${escapeHtml(r.source || 'OpenStreetMap')}</span>
+            ${r.website ? `<a href="${escapeHtml(r.website)}" target="_blank" rel="noopener" style="color:var(--accent); margin-left:8px;">Website →</a>` : ''}
+            ${r.phone ? `<span style="margin-left:6px;">📞 ${escapeHtml(r.phone)}</span>` : ''}
+          </div>
+        </div>`;
+    });
+
+    resultsList.innerHTML = html;
+    resultsCount.textContent = `${results.length} result${results.length !== 1 ? 's' : ''}`;
+    lastResults = results;
+
+    // Coverage note
+    if (query && query.coverage) {
+      const c = query.coverage;
+      coverageNote.innerHTML = `
+        <strong>Coverage:</strong> ${c.places_found} places found within ${c.search_radius_m/1000} km radius. 
+        Categories: ${escapeHtml(c.categories_found?.join(', ') || 'various')}. 
+        <span style="color:var(--text-muted);">Data from OpenStreetMap contributors (ODbL).</span>
+      `;
+      coverageNote.classList.remove('hidden');
+    } else {
+      coverageNote.classList.add('hidden');
+    }
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  // ── API calls ──
+  async function search() {
+    hideError();
+
+    const loc = location.value.trim();
+    if (!loc) {
+      showError('Please enter a location (city, neighbourhood, or address).');
+      location.focus();
+      return;
+    }
+
+    const b = parseFloat(budget.value) || 0;
+    const curr = budgetCurrency.value;
+    const t = parseFloat(timeAvailable.value) || 0;
+    const d = parseFloat(maxDistance.value) || 5;
+    const interests = getInterests();
+    const alone = getAlone();
+    const start = startTime.value || null;
+
+    const body = {
+      location: loc,
+      budget: b,
+      budget_currency: curr,
+      time_available_hours: t,
+      interests: interests.length > 0 ? interests : [],
+      alone: alone,
+      max_distance_km: d,
+      start_time: start,
+    };
+
+    showLoading(true);
+    try {
+      const resp = await fetch(`${API}/recommend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(err.detail || `HTTP ${resp.status}`);
+      }
+
+      const data = await resp.json();
+      hideError();
+      renderResults(data.results, data);
+      resultsArea.classList.remove('hidden');
+      splash.classList.add('hidden');
+      lastQuery = data.query;
+    } catch (err) {
+      showError(`Search failed: ${err.message}. Check your connection and try again.`);
+      resultsArea.classList.remove('hidden');
+      resultsList.innerHTML = `
+        <div class="empty-state">
+          <h3>Search failed</h3>
+          <p>${escapeHtml(err.message)}</p>
+          <p style="font-size:12px;">The backend may be unreachable or OpenStreetMap APIs may be rate-limiting.</p>
+        </div>`;
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  async function refine() {
+    if (!lastResults.length) {
+      showError('No previous results to refine. Run a search first.');
+      return;
+    }
+
+    hideError();
+    const text = refineInput.value.trim();
+    if (!text) {
+      showError('Enter a refinement, e.g. "Make it cheaper" or "Nothing involving food".');
+      refineInput.focus();
+      return;
+    }
+
+    showLoading(true);
+    try {
+      const resp = await fetch(`${API}/refine`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          previous_results: lastResults,
+          refinement: text,
+        }),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(err.detail || `HTTP ${resp.status}`);
+      }
+
+      const data = await resp.json();
+      hideError();
+      renderResults(data.results, null);
+      refineInput.value = '';
+      resultsCount.textContent = data.note || `${data.results.length} result${data.results.length !== 1 ? 's' : ''}`;
+    } catch (err) {
+      showError(`Refinement failed: ${err.message}`);
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  function clearResults() {
+    resultsArea.classList.add('hidden');
+    resultsList.innerHTML = '';
+    resultsCount.textContent = '';
+    coverageNote.classList.add('hidden');
+    lastResults = [];
+    lastQuery = null;
+    splash.classList.remove('hidden');
+    searchForm.style.display = '';
+  }
+
+  // ── Event listeners ──
+  searchBtn.addEventListener('click', search);
+  location.addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
+  refineBtn.addEventListener('click', refine);
+  refineInput.addEventListener('keydown', e => { if (e.key === 'Enter') refine(); });
+  clearResultsBtn.addEventListener('click', clearResults);
+
+  // Quick refinement pills
+  document.querySelectorAll('.quick-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      if (!lastResults.length) {
+        showError('Run a search first before refining.');
+        return;
+      }
+      refineInput.value = pill.dataset.refine;
+      refine();
+    });
+  });
+
+  // Enter key in refinement input
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.activeElement === refineInput) {
+      refine();
+    }
+  });
+
+  // ── Bootstrap: demo with sensible defaults ──
+  // Pre-fill with a prompt that invites the user to try
+  location.placeholder = 'e.g. Accra, Ghana or Shoreditch, London';
+  budget.placeholder = '100';
+  timeAvailable.placeholder = '3';
+  maxDistance.placeholder = '5';
+
+  // If the user hasn't interacted yet, show a friendly hint
+  console.log('LocalLens ready. Try: "Accra, Ghana" with GH₵100, 3 hours, solo, interested in food & culture.');
+})();
+</script>
+</body>
+</html>
