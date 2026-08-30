@@ -21,6 +21,16 @@
     --red: #f05757;
     --radius: 10px;
     --shadow: 0 4px 20px rgba(0,0,0,0.3);
+
+    /* Uiverse button glow palette (adapted from cssbuttons-io) */
+    --glow-color: rgb(108, 140, 255);
+    --glow-spread-color: rgba(108, 140, 255, 0.6);
+    --enhanced-glow-color: rgb(148, 176, 255);
+    --btn-color: #1a1d27;
+
+    /* Uiverse brutalist shadow (adapted from 0xnihilism) */
+    --brutal-shadow: 4px 4px 0 var(--accent);
+    --brutal-shadow-hover: 6px 6px 0 var(--accent);
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -87,10 +97,10 @@
     margin: 0 auto;
   }
 
-  /* ── Card ── */
+  /* ── Card (base) ── */
   .card {
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 2px solid var(--border);
     border-radius: var(--radius);
     padding: 20px;
     margin-bottom: 20px;
@@ -105,11 +115,14 @@
     margin-bottom: 16px;
   }
 
-  /* ── Form ── */
+  /* ════════════════════════════════════════════
+     UIPIVE #4: Search input — calm-baboon-55
+     Brutalist offset-shadow input with label
+     ════════════════════════════════════════════ */
   .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 14px;
   }
   @media (max-width: 600px) {
     .form-grid { grid-template-columns: 1fr; }
@@ -118,15 +131,23 @@
   .field { display: flex; flex-direction: column; gap: 6px; }
   .field.full { grid-column: 1 / -1; }
 
-  label {
+  .field label {
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    transition: color 0.3s;
   }
-  label .hint {
+  .field label .hint {
     color: #5a5f73;
     font-weight: normal;
     font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .field:focus-within label {
+    color: var(--accent);
   }
 
   input[type="text"],
@@ -134,24 +155,38 @@
   input[type="time"],
   select {
     background: var(--surface2);
-    border: 1px solid var(--border);
+    border: 2px solid var(--border);
     border-radius: 6px;
-    padding: 10px 12px;
+    padding: 11px 14px;
     color: var(--text);
     font-size: 14px;
     font-family: inherit;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
     outline: none;
+    box-shadow: var(--brutal-shadow);
   }
   input:focus, select:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-glow);
+    box-shadow: var(--brutal-shadow-hover);
+    transform: translate(-1px, -1px);
   }
   input::placeholder { color: #4a4e62; }
 
+  select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b8fa3' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+    cursor: pointer;
+  }
+  select:focus {
+    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236c8cff' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  }
+
   .checkbox-group {
     display: flex;
-    gap: 16px;
+    gap: 12px;
     flex-wrap: wrap;
     margin-top: 4px;
   }
@@ -161,6 +196,14 @@
     gap: 6px;
     cursor: pointer;
     font-size: 13px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+  }
+  .checkbox-item:hover {
+    background: var(--surface2);
+    border-color: var(--border);
   }
   .checkbox-item input[type="checkbox"] {
     accent-color: var(--accent);
@@ -168,39 +211,162 @@
     height: 15px;
   }
 
+  /* ════════════════════════════════════════════
+     UIPIVE #2: Button — funny-dog-69
+     Purple neon glow button with hover pulse
+     ════════════════════════════════════════════ */
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    background: var(--accent);
-    color: #fff;
-    border: none;
+    gap: 10px;
+    background: var(--btn-color);
+    color: var(--glow-color);
+    border: 2px solid var(--glow-color);
     border-radius: 8px;
-    padding: 12px 20px;
-    font-size: 14px;
-    font-weight: 600;
+    padding: 13px 24px;
+    font-size: 15px;
+    font-weight: 700;
     font-family: inherit;
     cursor: pointer;
-    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
     width: 100%;
-    margin-top: 8px;
+    margin-top: 12px;
+    position: relative;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    transition: all 0.3s;
+    box-shadow: 0 0 10px var(--glow-spread-color),
+                0 0 40px var(--glow-spread-color),
+                0 0 80px var(--glow-spread-color),
+                inset 0 0 10px var(--glow-spread-color);
+    text-shadow: 0 0 7px var(--glow-color), 0 0 10px var(--glow-color),
+                 0 0 21px var(--glow-color), 0 0 42px var(--glow-color);
+    overflow: hidden;
   }
-  .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px var(--accent-glow); }
-  .btn:active { transform: translateY(0); }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn::before {
+    content: '';
+    position: absolute;
+    top: -2px; left: -2px; right: -2px; bottom: -2px;
+    background: linear-gradient(45deg,
+      var(--glow-color), var(--enhanced-glow-color),
+      var(--glow-color), var(--enhanced-glow-color));
+    background-size: 400%;
+    border-radius: 8px;
+    z-index: -1;
+    filter: blur(5px);
+    opacity: 0;
+    transition: opacity 0.3s;
+    animation: glow-rotate 6s linear infinite;
+  }
+  .btn:hover::before {
+    opacity: 1;
+  }
+  .btn:hover {
+    background: rgba(108, 140, 255, 0.12);
+    box-shadow: 0 0 15px var(--glow-spread-color),
+                0 0 50px var(--glow-spread-color),
+                0 0 100px var(--glow-spread-color),
+                inset 0 0 15px var(--glow-spread-color);
+    transform: translateY(-2px);
+  }
+  .btn:active {
+    transform: translateY(0);
+  }
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 0 5px var(--glow-spread-color),
+                inset 0 0 5px var(--glow-spread-color);
+    text-shadow: none;
+  }
+  .btn:disabled::before { display: none; }
+  .btn:disabled:hover {
+    background: var(--btn-color);
+    transform: none;
+  }
+
+  @keyframes glow-rotate {
+    0% { background-position: 0 0; }
+    50% { background-position: 400% 0; }
+    100% { background-position: 0 0; }
+  }
 
   .btn-secondary {
     background: var(--surface2);
     color: var(--text);
-    border: 1px solid var(--border);
+    border: 2px solid var(--border);
+    box-shadow: 2px 2px 0 var(--border);
+    text-shadow: none;
   }
-  .btn-secondary:hover { background: var(--border); }
+  .btn-secondary::before { display: none; }
+  .btn-secondary:hover {
+    background: var(--border);
+    box-shadow: 3px 3px 0 var(--accent);
+    transform: translate(-1px, -1px);
+    text-shadow: none;
+  }
 
   .btn-small {
     padding: 8px 14px;
     font-size: 12px;
     width: auto;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  /* ════════════════════════════════════════════
+     UIPIVE #1: Loader — bright-firefox-37
+     Animated dots with pulse/wave/rotate
+     ════════════════════════════════════════════ */
+  .loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 20px;
+    gap: 20px;
+  }
+  .loader-dots {
+    display: flex;
+    gap: 8px;
+    --animation: 2s ease-in-out infinite;
+  }
+  .loader-dots .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--glow-spread-color), 0 0 20px var(--glow-spread-color);
+    animation: dot-wave var(--animation);
+  }
+  .loader-dots .dot:nth-child(1) { animation-delay: 0s; }
+  .loader-dots .dot:nth-child(2) { animation-delay: 0.15s; }
+  .loader-dots .dot:nth-child(3) { animation-delay: 0.3s; }
+  .loader-dots .dot:nth-child(4) { animation-delay: 0.45s; }
+  .loader-dots .dot:nth-child(5) { animation-delay: 0.6s; }
+
+  @keyframes dot-wave {
+    0%, 100% {
+      transform: scale(0.6);
+      opacity: 0.4;
+    }
+    50% {
+      transform: scale(1.3);
+      opacity: 1;
+      box-shadow: 0 0 12px var(--glow-spread-color), 0 0 30px var(--glow-spread-color);
+    }
+  }
+
+  .loader-text {
+    color: var(--text-muted);
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    animation: loader-text-pulse 2s ease-in-out infinite;
+  }
+  @keyframes loader-text-pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
   }
 
   /* ── Results ── */
@@ -231,18 +397,47 @@
   .confidence-estimated { background: rgba(240, 185, 11, 0.15); color: var(--yellow); border: 1px solid rgba(240, 185, 11, 0.3); }
   .confidence-unknown { background: rgba(139, 143, 163, 0.15); color: var(--text-muted); border: 1px solid rgba(139, 143, 163, 0.3); }
 
+  /* ════════════════════════════════════════════
+     UIPIVE #3: Result cards — average-mole-62
+     Brutalist 3D cards with offset shadow
+     ════════════════════════════════════════════ */
   .result-card {
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 2px solid var(--border);
     border-radius: var(--radius);
-    padding: 18px 20px;
-    margin-bottom: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    transition: border-color 0.2s;
+    gap: 10px;
+    transition: all 0.3s ease;
+    box-shadow: var(--brutal-shadow);
+    position: relative;
+    overflow: hidden;
   }
-  .result-card:hover { border-color: #3d4257; }
+  .result-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--border);
+    transition: background 0.3s, width 0.3s;
+  }
+  .result-card:hover {
+    border-color: var(--accent);
+    box-shadow: var(--brutal-shadow-hover);
+    transform: translate(-2px, -2px);
+  }
+  .result-card:hover::before {
+    background: var(--accent);
+    width: 5px;
+  }
+  .result-card.top-match::before {
+    background: var(--accent);
+    width: 5px;
+  }
 
   .result-top {
     display: flex;
@@ -252,19 +447,21 @@
     flex-wrap: wrap;
   }
   .result-name {
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 17px;
+    font-weight: 700;
     color: #fff;
+    letter-spacing: -0.2px;
   }
   .result-category {
     font-size: 11px;
-    color: var(--text-muted);
+    color: var(--accent);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    background: var(--surface2);
-    padding: 2px 8px;
+    letter-spacing: 0.8px;
+    font-weight: 600;
+    background: rgba(108, 140, 255, 0.1);
+    padding: 3px 10px;
     border-radius: 4px;
-    border: 1px solid var(--border);
+    border: 1px solid rgba(108, 140, 255, 0.2);
   }
 
   .result-score {
@@ -274,8 +471,8 @@
     margin-left: auto;
   }
   .score-ring {
-    width: 44px;
-    height: 44px;
+    width: 46px;
+    height: 46px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -285,6 +482,10 @@
     background: var(--surface2);
     border: 2px solid var(--border);
     flex-shrink: 0;
+    transition: all 0.3s;
+  }
+  .result-card:hover .score-ring {
+    border-color: var(--accent);
   }
   .score-ring.high { border-color: var(--green); color: var(--green); }
   .score-ring.medium { border-color: var(--yellow); color: var(--yellow); }
@@ -293,7 +494,7 @@
   .result-details {
     display: flex;
     flex-wrap: wrap;
-    gap: 16px 24px;
+    gap: 12px 20px;
     font-size: 13px;
     color: var(--text-muted);
   }
@@ -333,11 +534,6 @@
 
   /* ── Refinement bar ── */
   .refinement-bar {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px 20px;
-    margin-top: 16px;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -350,22 +546,26 @@
   .refinement-input input {
     width: 100%;
     background: var(--surface2);
-    border: 1px solid var(--border);
+    border: 2px solid var(--border);
     border-radius: 6px;
     padding: 10px 12px;
     color: var(--text);
     font-size: 13px;
     font-family: inherit;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    box-shadow: 2px 2px 0 var(--border);
   }
-  .refinement-input input:focus { border-color: var(--accent); }
+  .refinement-input input:focus {
+    border-color: var(--accent);
+    box-shadow: 3px 3px 0 var(--accent);
+  }
 
   .quick-refinements {
     display: flex;
     gap: 6px;
     flex-wrap: wrap;
-    margin-top: 10px;
+    margin-top: 12px;
   }
   .quick-pill {
     background: var(--surface2);
@@ -378,37 +578,18 @@
     transition: all 0.2s;
     white-space: nowrap;
   }
-  .quick-pill:hover { border-color: var(--accent); color: var(--text); background: var(--border); }
-
-  /* ── Loading ── */
-  .loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 48px;
-    gap: 10px;
-    color: var(--text-muted);
-    font-size: 14px;
-  }
-  .spinner {
-    width: 24px;
-    height: 24px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .quick-pill:hover { border-color: var(--accent); color: var(--text); background: rgba(108,140,255,0.1); }
 
   /* ── Error ── */
   .error-box {
     background: rgba(240, 87, 87, 0.1);
-    border: 1px solid rgba(240, 87, 87, 0.3);
+    border: 2px solid rgba(240, 87, 87, 0.3);
     border-radius: var(--radius);
     padding: 16px 20px;
     color: var(--red);
     font-size: 13px;
     margin-bottom: 12px;
+    box-shadow: 3px 3px 0 rgba(240, 87, 87, 0.15);
   }
 
   /* ── Empty ── */
@@ -462,11 +643,12 @@
   /* ── Intro splash ── */
   .intro-splash {
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 2px solid var(--border);
     border-radius: var(--radius);
     padding: 32px 24px;
     margin-bottom: 20px;
     text-align: center;
+    box-shadow: var(--brutal-shadow);
   }
   .intro-splash h2 {
     font-size: 14px;
@@ -489,7 +671,7 @@
   /* ── Scoring model reference ── */
   .scoring-ref {
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 2px solid var(--border);
     border-radius: var(--radius);
     padding: 14px 18px;
     margin-top: 16px;
@@ -524,11 +706,11 @@
   /* ── Map ── */
   #mapContainer {
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 2px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
     margin-bottom: 20px;
-    box-shadow: var(--shadow);
+    box-shadow: var(--brutal-shadow);
   }
   #map {
     width: 100%;
@@ -553,7 +735,7 @@
   }
   .map-toggle {
     background: var(--surface2);
-    border: 1px solid var(--border);
+    border: 2px solid var(--border);
     border-radius: 6px;
     padding: 5px 12px;
     font-size: 12px;
@@ -561,16 +743,17 @@
     cursor: pointer;
     font-family: inherit;
     transition: all 0.2s;
+    box-shadow: 2px 2px 0 var(--border);
   }
-  .map-toggle:hover { border-color: var(--accent); color: var(--text); }
+  .map-toggle:hover { border-color: var(--accent); color: var(--text); transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--accent); }
 
   /* Leaflet popup styling */
   .leaflet-popup-content-wrapper {
     background: var(--surface) !important;
-    border: 1px solid var(--border) !important;
+    border: 2px solid var(--border) !important;
     border-radius: 8px !important;
     color: var(--text) !important;
-    box-shadow: var(--shadow) !important;
+    box-shadow: var(--brutal-shadow) !important;
   }
   .leaflet-popup-tip { background: var(--surface) !important; }
   .leaflet-popup-content { margin: 12px 14px !important; font-size: 13px !important; line-height: 1.5 !important; }
@@ -600,6 +783,7 @@
   .website-btn:hover {
     background: rgba(108, 140, 255, 0.2);
     border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(108, 140, 255, 0.3);
   }
   .website-unavailable {
     font-size: 11px;
@@ -611,7 +795,7 @@
   /* ── Result card highlight ── */
   .result-card.highlighted {
     border-color: var(--accent) !important;
-    box-shadow: 0 0 0 2px var(--accent-glow);
+    box-shadow: 0 0 0 3px var(--accent-glow), var(--brutal-shadow-hover) !important;
     transition: border-color 0.3s, box-shadow 0.3s;
   }
 
@@ -731,8 +915,9 @@
     </div>
 
     <button class="btn" id="searchBtn">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="opacity:0.8;">
-        <path d="M8 1a7 7 0 100 14A7 7 0 008 1zM7 5l-.7 4h4.6l-.7-4M11 8h2v4h-2z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
       Find things to do
     </button>
@@ -780,10 +965,16 @@
     <div id="map"></div>
   </div>
 
-  <!-- Loading -->
+  <!-- Loading — Uiverse bright-firefox-37 inspired dots loader -->
   <div id="loading" class="hidden loading">
-    <div class="spinner"></div>
-    <span>Searching OpenStreetMap for places near you...</span>
+    <div class="loader-dots">
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+    <span class="loader-text">Searching OpenStreetMap for places near you...</span>
   </div>
 
   <!-- Error -->
@@ -922,7 +1113,6 @@
 
   function formatOpeningHours(hours) {
     if (!hours || hours === 'Unknown' || hours === '') return 'Hours not listed';
-    // Trim long strings
     if (hours.length > 80) return hours.substring(0, 77) + '...';
     return hours;
   }
@@ -941,8 +1131,6 @@
       mapContainer.classList.add('hidden');
       return;
     }
-
-    const topScore = results[0].score;
 
     let html = '';
     results.forEach((r, i) => {
@@ -970,7 +1158,7 @@
       const address = r.address && r.address !== 'Location only' ? r.address : '';
 
       html += `
-        <div class="result-card" id="card-${i}" style="${isTop ? 'border-color: var(--accent);' : ''}" ${hasCoords ? `data-lat="${r.lat}" data-lon="${r.lon}"` : ''}>
+        <div class="result-card${isTop ? ' top-match' : ''}" id="card-${i}" ${hasCoords ? `data-lat="${r.lat}" data-lon="${r.lon}"` : ''}>
           <div class="result-top">
             <div style="display:flex; align-items:flex-start; gap:10px; flex:1;">
               <div class="score-ring ${scoreClass}" title="${rankLabel}">
@@ -978,13 +1166,13 @@
               </div>
               <div>
                 <div class="result-name">${escapeHtml(r.name)}</div>
-                <div>
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:4px;">
                   <span class="result-category">${escapeHtml(r.category)}</span>
-                  <span class="confidence-badge ${confidenceClass(r.confidence)}" style="margin-left:8px;">
+                  <span class="confidence-badge ${confidenceClass(r.confidence)}">
                     ${confidenceLabel(r.confidence)}
                   </span>
                 </div>
-                ${address ? `<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">📍 ${escapeHtml(address)}</div>` : ''}
+                ${address ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">📍 ${escapeHtml(address)}</div>` : ''}
               </div>
             </div>
             <div class="result-score">
@@ -1091,7 +1279,6 @@
     mapContainer.classList.remove('hidden');
 
     if (!map) {
-      // Initialize Leaflet map with OpenStreetMap tiles
       map = L.map('map', {
         zoomControl: true,
         attributionControl: true,
@@ -1102,7 +1289,6 @@
         maxZoom: 19,
       }).addTo(map);
 
-      // Map toggle
       mapToggle.addEventListener('click', () => {
         mapVisible = !mapVisible;
         const mapEl = document.getElementById('map');
@@ -1116,19 +1302,16 @@
         }
       });
     } else {
-      // Clear existing markers
       markers.forEach(m => map.removeLayer(m));
       markers = [];
     }
 
-    // Add markers for each result
     results.forEach((r, i) => {
       if (!r.lat || !r.lon) return;
 
       const isTop = (i === 0);
       const markerColor = isTop ? '#6c8cff' : (r.score >= 7 ? '#3ecf8e' : (r.score >= 4 ? '#f0b90b' : '#f05757'));
 
-      // Create custom icon
       const icon = L.divIcon({
         className: '',
         html: `<div style="width:28px;height:28px;border-radius:50%;background:${markerColor};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);">${i + 1}</div>`,
@@ -1139,7 +1322,6 @@
 
       const marker = L.marker([r.lat, r.lon], { icon }).addTo(map);
 
-      // Build popup content
       const address = r.address && r.address !== 'Location only' ? r.address : '';
       let popupHtml = `
         <div>
@@ -1153,7 +1335,6 @@
 
       marker.bindPopup(popupHtml, { maxWidth: 280 });
 
-      // Click marker → scroll to and highlight card
       marker.on('click', () => {
         const card = document.getElementById(`card-${i}`);
         if (card) {
@@ -1166,7 +1347,6 @@
       markers.push(marker);
     });
 
-    // Fit map to show all markers
     if (coords.length === 1) {
       map.setView(coords[0], 15);
     } else {
@@ -1174,7 +1354,6 @@
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
     }
 
-    // Force map to recalculate size
     setTimeout(() => map.invalidateSize(), 200);
   }
 
@@ -1183,13 +1362,11 @@
     document.querySelectorAll('.result-card[data-lat]').forEach((card, i) => {
       card.style.cursor = 'pointer';
       card.addEventListener('click', (e) => {
-        // Don't trigger if clicking a link or button
         if (e.target.closest('a, button')) return;
         const lat = parseFloat(card.dataset.lat);
         const lon = parseFloat(card.dataset.lon);
         if (map && lat && lon) {
           map.setView([lat, lon], 17, { animate: true });
-          // Find and open the corresponding marker popup
           const idx = lastResults.findIndex(r => r.lat === lat && r.lon === lon);
           if (idx >= 0 && markers[idx]) {
             markers[idx].openPopup();
@@ -1354,14 +1531,12 @@
     }
   });
 
-  // ── Bootstrap: demo with sensible defaults ──
-  // Pre-fill with a prompt that invites the user to try
+  // ── Bootstrap ──
   location.placeholder = 'e.g. Accra, Ghana or Shoreditch, London';
   budget.placeholder = '100';
   timeAvailable.placeholder = '3';
   maxDistance.placeholder = '5';
 
-  // If the user hasn't interacted yet, show a friendly hint
   console.log('LocalLens ready. Try: "Accra, Ghana" with GH₵100, 3 hours, solo, interested in food & culture.');
 })();
 </script>
