@@ -6,6 +6,7 @@
 <title>LocalLens — What can I do right now?</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <style>
   :root {
     --bg: #0f1117;
@@ -21,14 +22,10 @@
     --red: #f05757;
     --radius: 10px;
     --shadow: 0 4px 20px rgba(0,0,0,0.3);
-
-    /* Uiverse button glow palette (adapted from cssbuttons-io) */
     --glow-color: rgb(108, 140, 255);
     --glow-spread-color: rgba(108, 140, 255, 0.6);
     --enhanced-glow-color: rgb(148, 176, 255);
     --btn-color: #1a1d27;
-
-    /* Uiverse brutalist shadow (adapted from 0xnihilism) */
     --brutal-shadow: 4px 4px 0 var(--accent);
     --brutal-shadow-hover: 6px 6px 0 var(--accent);
   }
@@ -41,9 +38,146 @@
     color: var(--text);
     line-height: 1.55;
     min-height: 100vh;
+    overflow-x: hidden;
   }
 
-  /* ── Header ── */
+  /* ════════════════════════════════════════════
+     VIEWS — Page-level sections
+     ════════════════════════════════════════════ */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ════════════════════════════════════════════
+     LANDING VIEW
+     ════════════════════════════════════════════ */
+  #view-landing {
+    min-height: 100vh;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  #view-landing.active { display: flex; }
+
+  .landing-bg {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 30%, rgba(108,140,255,0.08) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 80%, rgba(62,207,142,0.04) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .landing-content {
+    position: relative;
+    z-index: 1;
+    max-width: 640px;
+  }
+
+  .landing-logo {
+    font-size: 48px;
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .landing-logo span { -webkit-text-fill-color: var(--accent); }
+
+  .landing-tagline {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 12px;
+    letter-spacing: -0.3px;
+  }
+
+  .landing-desc {
+    font-size: 16px;
+    color: var(--text-muted);
+    max-width: 480px;
+    margin: 0 auto 40px;
+    line-height: 1.65;
+  }
+
+  .landing-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--btn-color);
+    color: var(--glow-color);
+    border: 2px solid var(--glow-color);
+    border-radius: 10px;
+    padding: 16px 36px;
+    font-size: 17px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.3s;
+    box-shadow: 0 0 10px var(--glow-spread-color),
+                0 0 40px var(--glow-spread-color),
+                inset 0 0 10px var(--glow-spread-color);
+    text-shadow: 0 0 7px var(--glow-color), 0 0 10px var(--glow-color);
+    position: relative;
+    overflow: hidden;
+  }
+  .landing-cta::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(45deg, var(--glow-color), var(--enhanced-glow-color), var(--glow-color));
+    background-size: 400%;
+    border-radius: 10px;
+    z-index: -1;
+    filter: blur(5px);
+    opacity: 0;
+    transition: opacity 0.3s;
+    animation: glow-rotate 6s linear infinite;
+  }
+  .landing-cta:hover::before { opacity: 1; }
+  .landing-cta:hover {
+    background: rgba(108,140,255,0.12);
+    box-shadow: 0 0 15px var(--glow-spread-color),
+                0 0 50px var(--glow-spread-color),
+                inset 0 0 15px var(--glow-spread-color);
+    transform: translateY(-2px);
+  }
+  .landing-cta:active { transform: translateY(0); }
+
+  .landing-badges {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-top: 32px;
+    flex-wrap: wrap;
+  }
+  .landing-badge {
+    font-size: 12px;
+    color: var(--text-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .landing-badge .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+
+  /* ════════════════════════════════════════════
+     HEADER
+     ════════════════════════════════════════════ */
   .header {
     background: var(--surface);
     border-bottom: 1px solid var(--border);
@@ -60,6 +194,7 @@
     font-weight: 700;
     letter-spacing: -0.3px;
     color: #fff;
+    cursor: pointer;
   }
   .logo span { color: var(--accent); }
   .header-tagline {
@@ -68,46 +203,243 @@
     margin-left: auto;
   }
 
-  /* ── Layout ── */
+  /* ════════════════════════════════════════════
+     SEARCH VIEW
+     ════════════════════════════════════════════ */
+  #view-search { padding-bottom: 40px; }
+
   .container {
     max-width: 900px;
     margin: 0 auto;
     padding: 24px 16px 40px;
   }
 
-  /* ── Hero ── */
-  .hero {
-    text-align: center;
-    margin-bottom: 32px;
+  /* ── Location chip ── */
+  .location-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
   }
-  .hero h1 {
-    font-size: 28px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-    margin-bottom: 8px;
-    background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  .location-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 7px 14px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s;
   }
-  .hero p {
+  .location-chip:hover { border-color: var(--accent); }
+  .location-chip .loc-icon { color: var(--accent); }
+  .location-chip .loc-text { font-weight: 500; }
+  .location-chip .loc-change {
+    font-size: 11px;
     color: var(--text-muted);
-    font-size: 14px;
-    max-width: 480px;
-    margin: 0 auto;
+    margin-left: 4px;
   }
 
-  /* ── Card (base) ── */
-  .card {
+  .location-manual {
+    display: none;
+    flex: 1;
+    min-width: 200px;
+  }
+  .location-manual.visible { display: flex; gap: 8px; align-items: center; }
+  .location-manual input {
+    flex: 1;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.3s;
+  }
+  .location-manual input:focus { border-color: var(--accent); }
+  .location-manual input::placeholder { color: #4a4e62; }
+  .location-confirm-btn {
+    background: var(--surface2);
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    padding: 10px 16px;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+  }
+  .location-confirm-btn:hover { background: rgba(108,140,255,0.1); }
+
+  .location-pending {
+    font-size: 13px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .location-pending .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Geolocation permission overlay ── */
+  .geo-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15,17,23,0.85);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .geo-overlay.visible { display: flex; }
+  .geo-overlay-card {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: var(--shadow);
+  }
+  .geo-overlay-card h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .geo-overlay-card p {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+  .geo-overlay-card .detected-loc {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 20px;
+  }
+  .geo-overlay-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* ── NLP Search bar ── */
+  .nlp-search-section {
+    margin-bottom: 20px;
+  }
+  .nlp-search-bar {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+  }
+  .nlp-input-wrap {
+    flex: 1;
+    position: relative;
+  }
+  .nlp-input {
+    width: 100%;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    color: var(--text);
+    font-size: 17px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    box-shadow: var(--brutal-shadow);
+  }
+  .nlp-input:focus {
+    border-color: var(--accent);
+    box-shadow: var(--brutal-shadow-hover);
+  }
+  .nlp-input::placeholder { color: #4a4e62; font-size: 16px; }
+
+  .nlp-submit {
+    background: var(--btn-color);
+    color: var(--glow-color);
+    border: 2px solid var(--glow-color);
+    border-radius: 10px;
+    padding: 16px 28px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    transition: all 0.3s;
+    box-shadow: 0 0 8px var(--glow-spread-color),
+                inset 0 0 8px var(--glow-spread-color);
+    text-shadow: 0 0 5px var(--glow-color);
+  }
+  .nlp-submit:hover {
+    background: rgba(108,140,255,0.12);
+    box-shadow: 0 0 15px var(--glow-spread-color),
+                inset 0 0 12px var(--glow-spread-color);
+    transform: translateY(-1px);
+  }
+  .nlp-submit:active { transform: translateY(0); }
+  .nlp-submit:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* ── Advanced options toggle ── */
+  .advanced-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: inherit;
+    padding: 4px 0;
+    transition: color 0.2s;
+  }
+  .advanced-toggle:hover { color: var(--accent); }
+  .advanced-toggle .arrow {
+    display: inline-block;
+    transition: transform 0.3s;
+    font-size: 10px;
+  }
+  .advanced-toggle.open .arrow { transform: rotate(90deg); }
+
+  /* ── Advanced options panel ── */
+  .advanced-panel {
+    display: none;
+    overflow: hidden;
+  }
+  .advanced-panel.open { display: block; }
+
+  .advanced-inner {
     background: var(--surface);
     border: 2px solid var(--border);
     border-radius: var(--radius);
     padding: 20px;
-    margin-bottom: 20px;
+    margin-top: 12px;
     box-shadow: var(--shadow);
   }
-  .card h2 {
-    font-size: 14px;
+  .advanced-inner h3 {
+    font-size: 13px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -115,22 +447,15 @@
     margin-bottom: 16px;
   }
 
-  /* ════════════════════════════════════════════
-     UIPIVE #4: Search input — calm-baboon-55
-     Brutalist offset-shadow input with label
-     ════════════════════════════════════════════ */
   .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 14px;
   }
-  @media (max-width: 600px) {
-    .form-grid { grid-template-columns: 1fr; }
-  }
+  @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
 
   .field { display: flex; flex-direction: column; gap: 6px; }
   .field.full { grid-column: 1 / -1; }
-
   .field label {
     font-size: 12px;
     font-weight: 600;
@@ -146,9 +471,7 @@
     text-transform: none;
     letter-spacing: 0;
   }
-  .field:focus-within label {
-    color: var(--accent);
-  }
+  .field:focus-within label { color: var(--accent); }
 
   input[type="text"],
   input[type="number"],
@@ -180,13 +503,10 @@
     padding-right: 32px;
     cursor: pointer;
   }
-  select:focus {
-    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236c8cff' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
-  }
 
   .checkbox-group {
     display: flex;
-    gap: 12px;
+    gap: 10px;
     flex-wrap: wrap;
     margin-top: 4px;
   }
@@ -207,85 +527,12 @@
   }
   .checkbox-item input[type="checkbox"] {
     accent-color: var(--accent);
-    width: 15px;
-    height: 15px;
+    width: 15px; height: 15px;
   }
 
   /* ════════════════════════════════════════════
-     UIPIVE #2: Button — funny-dog-69
-     Purple neon glow button with hover pulse
+     BUTTONS (shared)
      ════════════════════════════════════════════ */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    background: var(--btn-color);
-    color: var(--glow-color);
-    border: 2px solid var(--glow-color);
-    border-radius: 8px;
-    padding: 13px 24px;
-    font-size: 15px;
-    font-weight: 700;
-    font-family: inherit;
-    cursor: pointer;
-    width: 100%;
-    margin-top: 12px;
-    position: relative;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    transition: all 0.3s;
-    box-shadow: 0 0 10px var(--glow-spread-color),
-                0 0 40px var(--glow-spread-color),
-                0 0 80px var(--glow-spread-color),
-                inset 0 0 10px var(--glow-spread-color);
-    text-shadow: 0 0 7px var(--glow-color), 0 0 10px var(--glow-color),
-                 0 0 21px var(--glow-color), 0 0 42px var(--glow-color);
-    overflow: hidden;
-  }
-  .btn::before {
-    content: '';
-    position: absolute;
-    top: -2px; left: -2px; right: -2px; bottom: -2px;
-    background: linear-gradient(45deg,
-      var(--glow-color), var(--enhanced-glow-color),
-      var(--glow-color), var(--enhanced-glow-color));
-    background-size: 400%;
-    border-radius: 8px;
-    z-index: -1;
-    filter: blur(5px);
-    opacity: 0;
-    transition: opacity 0.3s;
-    animation: glow-rotate 6s linear infinite;
-  }
-  .btn:hover::before {
-    opacity: 1;
-  }
-  .btn:hover {
-    background: rgba(108, 140, 255, 0.12);
-    box-shadow: 0 0 15px var(--glow-spread-color),
-                0 0 50px var(--glow-spread-color),
-                0 0 100px var(--glow-spread-color),
-                inset 0 0 15px var(--glow-spread-color);
-    transform: translateY(-2px);
-  }
-  .btn:active {
-    transform: translateY(0);
-  }
-  .btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: 0 0 5px var(--glow-spread-color),
-                inset 0 0 5px var(--glow-spread-color);
-    text-shadow: none;
-  }
-  .btn:disabled::before { display: none; }
-  .btn:disabled:hover {
-    background: var(--btn-color);
-    transform: none;
-  }
-
   @keyframes glow-rotate {
     0% { background-position: 0 0; }
     50% { background-position: 400% 0; }
@@ -296,49 +543,54 @@
     background: var(--surface2);
     color: var(--text);
     border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
     box-shadow: 2px 2px 0 var(--border);
-    text-shadow: none;
+    transition: all 0.2s;
   }
-  .btn-secondary::before { display: none; }
   .btn-secondary:hover {
     background: var(--border);
     box-shadow: 3px 3px 0 var(--accent);
     transform: translate(-1px, -1px);
-    text-shadow: none;
   }
 
   .btn-small {
     padding: 8px 14px;
     font-size: 12px;
     width: auto;
-    text-transform: none;
-    letter-spacing: 0;
   }
 
   /* ════════════════════════════════════════════
-     UIPIVE #1: Loader — bright-firefox-37
-     Animated dots with pulse/wave/rotate
+     LOADING
      ════════════════════════════════════════════ */
-  .loading {
-    display: flex;
+  #view-loading {
+    position: fixed;
+    inset: 0;
+    background: rgba(15,17,23,0.9);
+    z-index: 150;
+    display: none;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 48px 20px;
     gap: 20px;
+    padding: 40px;
   }
+  #view-loading.active { display: flex; }
+
   .loader-dots {
     display: flex;
     gap: 8px;
-    --animation: 2s ease-in-out infinite;
   }
   .loader-dots .dot {
-    width: 12px;
-    height: 12px;
+    width: 12px; height: 12px;
     border-radius: 50%;
     background: var(--accent);
     box-shadow: 0 0 8px var(--glow-spread-color), 0 0 20px var(--glow-spread-color);
-    animation: dot-wave var(--animation);
+    animation: dot-wave 2s ease-in-out infinite;
   }
   .loader-dots .dot:nth-child(1) { animation-delay: 0s; }
   .loader-dots .dot:nth-child(2) { animation-delay: 0.15s; }
@@ -347,15 +599,9 @@
   .loader-dots .dot:nth-child(5) { animation-delay: 0.6s; }
 
   @keyframes dot-wave {
-    0%, 100% {
-      transform: scale(0.6);
-      opacity: 0.4;
-    }
-    50% {
-      transform: scale(1.3);
-      opacity: 1;
-      box-shadow: 0 0 12px var(--glow-spread-color), 0 0 30px var(--glow-spread-color);
-    }
+    0%, 100% { transform: scale(0.6); opacity: 0.4; }
+    50% { transform: scale(1.3); opacity: 1;
+      box-shadow: 0 0 12px var(--glow-spread-color), 0 0 30px var(--glow-spread-color); }
   }
 
   .loader-text {
@@ -369,7 +615,16 @@
     50% { opacity: 1; }
   }
 
-  /* ── Results ── */
+  .loader-tip {
+    font-size: 11px;
+    color: #5a5f73;
+    max-width: 300px;
+    text-align: center;
+  }
+
+  /* ════════════════════════════════════════════
+     RESULTS
+     ════════════════════════════════════════════ */
   .results-header {
     display: flex;
     align-items: center;
@@ -384,6 +639,28 @@
   }
   .results-count strong { color: var(--text); }
 
+  .suggestion-chips {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .suggestion-chip {
+    background: rgba(108,140,255,0.08);
+    border: 1px solid rgba(108,140,255,0.25);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--accent);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .suggestion-chip:hover {
+    background: rgba(108,140,255,0.15);
+    border-color: var(--accent);
+  }
+
   .confidence-badge {
     display: inline-block;
     padding: 2px 8px;
@@ -393,14 +670,11 @@
     text-transform: uppercase;
     letter-spacing: 0.3px;
   }
-  .confidence-verified { background: rgba(62, 207, 142, 0.15); color: var(--green); border: 1px solid rgba(62, 207, 142, 0.3); }
-  .confidence-estimated { background: rgba(240, 185, 11, 0.15); color: var(--yellow); border: 1px solid rgba(240, 185, 11, 0.3); }
-  .confidence-unknown { background: rgba(139, 143, 163, 0.15); color: var(--text-muted); border: 1px solid rgba(139, 143, 163, 0.3); }
+  .confidence-verified { background: rgba(62,207,142,0.15); color: var(--green); border: 1px solid rgba(62,207,142,0.3); }
+  .confidence-estimated { background: rgba(240,185,11,0.15); color: var(--yellow); border: 1px solid rgba(240,185,11,0.3); }
+  .confidence-unknown { background: rgba(139,143,163,0.15); color: var(--text-muted); border: 1px solid rgba(139,143,163,0.3); }
 
-  /* ════════════════════════════════════════════
-     UIPIVE #3: Result cards — average-mole-62
-     Brutalist 3D cards with offset shadow
-     ════════════════════════════════════════════ */
+  /* ── Result cards ── */
   .result-card {
     background: var(--surface);
     border: 2px solid var(--border);
@@ -418,10 +692,8 @@
   .result-card::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 4px;
-    height: 100%;
+    top: 0; left: 0;
+    width: 4px; height: 100%;
     background: var(--border);
     transition: background 0.3s, width 0.3s;
   }
@@ -430,14 +702,8 @@
     box-shadow: var(--brutal-shadow-hover);
     transform: translate(-2px, -2px);
   }
-  .result-card:hover::before {
-    background: var(--accent);
-    width: 5px;
-  }
-  .result-card.top-match::before {
-    background: var(--accent);
-    width: 5px;
-  }
+  .result-card:hover::before { background: var(--accent); width: 5px; }
+  .result-card.top-match::before { background: var(--accent); width: 5px; }
 
   .result-top {
     display: flex;
@@ -458,21 +724,15 @@
     text-transform: uppercase;
     letter-spacing: 0.8px;
     font-weight: 600;
-    background: rgba(108, 140, 255, 0.1);
+    background: rgba(108,140,255,0.1);
     padding: 3px 10px;
     border-radius: 4px;
-    border: 1px solid rgba(108, 140, 255, 0.2);
+    border: 1px solid rgba(108,140,255,0.2);
   }
 
-  .result-score {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: auto;
-  }
+  .result-score { display: flex; align-items: center; gap: 6px; margin-left: auto; }
   .score-ring {
-    width: 46px;
-    height: 46px;
+    width: 46px; height: 46px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -484,9 +744,7 @@
     flex-shrink: 0;
     transition: all 0.3s;
   }
-  .result-card:hover .score-ring {
-    border-color: var(--accent);
-  }
+  .result-card:hover .score-ring { border-color: var(--accent); }
   .score-ring.high { border-color: var(--green); color: var(--green); }
   .score-ring.medium { border-color: var(--yellow); color: var(--yellow); }
   .score-ring.low { border-color: var(--red); color: var(--red); }
@@ -498,11 +756,7 @@
     font-size: 13px;
     color: var(--text-muted);
   }
-  .result-details .detail {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
+  .result-details .detail { display: flex; align-items: center; gap: 5px; }
   .result-details .detail .label { color: #5a5f73; }
   .result-details .detail .value { color: var(--text); }
 
@@ -532,17 +786,65 @@
     color: var(--text-muted);
   }
 
-  /* ── Refinement bar ── */
-  .refinement-bar {
-    display: flex;
+  /* ── Website button ── */
+  .website-btn {
+    display: inline-flex;
     align-items: center;
-    gap: 12px;
+    gap: 5px;
+    background: rgba(108,140,255,0.1);
+    border: 1px solid rgba(108,140,255,0.3);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 12px;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.2s;
+    margin-top: 6px;
+  }
+  .website-btn:hover {
+    background: rgba(108,140,255,0.2);
+    border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(108,140,255,0.3);
+  }
+
+  /* ── Score breakdown ── */
+  .breakdown {
+    display: flex;
+    gap: 16px;
     flex-wrap: wrap;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-muted);
   }
-  .refinement-input {
-    flex: 1;
-    min-width: 200px;
+  .breakdown-item { display: flex; align-items: center; gap: 5px; }
+  .breakdown-bar {
+    width: 60px; height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
   }
+  .breakdown-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+  }
+
+  /* ── Coverage note ── */
+  .coverage-note {
+    font-size: 12px;
+    color: var(--text-muted);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-top: 12px;
+    line-height: 1.5;
+  }
+
+  /* ── Refinement bar ── */
+  .refinement-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .refinement-input { flex: 1; min-width: 200px; }
   .refinement-input input {
     width: 100%;
     background: var(--surface2);
@@ -580,130 +882,9 @@
   }
   .quick-pill:hover { border-color: var(--accent); color: var(--text); background: rgba(108,140,255,0.1); }
 
-  /* ── Error ── */
-  .error-box {
-    background: rgba(240, 87, 87, 0.1);
-    border: 2px solid rgba(240, 87, 87, 0.3);
-    border-radius: var(--radius);
-    padding: 16px 20px;
-    color: var(--red);
-    font-size: 13px;
-    margin-bottom: 12px;
-    box-shadow: 3px 3px 0 rgba(240, 87, 87, 0.15);
-  }
-
-  /* ── Empty ── */
-  .empty-state {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--text-muted);
-  }
-  .empty-state h3 { font-size: 16px; color: var(--text); margin-bottom: 8px; }
-  .empty-state p { font-size: 13px; max-width: 380px; margin: 0 auto 16px; }
-
-  /* ── Score breakdown ── */
-  .breakdown {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-    margin-top: 4px;
-    font-size: 12px;
-    color: var(--text-muted);
-  }
-  .breakdown-item {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .breakdown-bar {
-    width: 60px;
-    height: 4px;
-    background: var(--surface2);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-  .breakdown-fill {
-    height: 100%;
-    border-radius: 2px;
-    background: var(--accent);
-  }
-
-  /* ── Coverage note ── */
-  .coverage-note {
-    font-size: 12px;
-    color: var(--text-muted);
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 16px;
-    margin-top: 12px;
-    line-height: 1.5;
-  }
-
-  /* ── Intro splash ── */
-  .intro-splash {
-    background: var(--surface);
-    border: 2px solid var(--border);
-    border-radius: var(--radius);
-    padding: 32px 24px;
-    margin-bottom: 20px;
-    text-align: center;
-    box-shadow: var(--brutal-shadow);
-  }
-  .intro-splash h2 {
-    font-size: 14px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-muted);
-    margin-bottom: 16px;
-    text-align: left;
-  }
-  .intro-splash p {
-    font-size: 15px;
-    color: var(--text);
-    max-width: 600px;
-    margin: 0 auto 20px;
-    line-height: 1.6;
-  }
-  .intro-splash p strong { color: var(--accent); }
-
-  /* ── Scoring model reference ── */
-  .scoring-ref {
-    background: var(--surface);
-    border: 2px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px 18px;
-    margin-top: 16px;
-    font-size: 12px;
-    color: var(--text-muted);
-  }
-  .scoring-ref summary {
-    cursor: pointer;
-    color: var(--accent);
-    font-weight: 500;
-    user-select: none;
-    margin-bottom: 6px;
-  }
-  .scoring-ref table { width: 100%; margin-top: 8px; border-collapse: collapse; }
-  .scoring-ref th, .scoring-ref td {
-    text-align: left;
-    padding: 4px 8px;
-    border-bottom: 1px solid var(--border);
-  }
-  .scoring-ref th { color: #5a5f73; font-weight: 500; }
-
-  /* ── Scrollbar ── */
-  ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--border); }
-
-  /* ── Utility ── */
-  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
-  .hidden { display: none !important; }
-
-  /* ── Map ── */
+  /* ════════════════════════════════════════════
+     MAP
+     ════════════════════════════════════════════ */
   #mapContainer {
     background: var(--surface);
     border: 2px solid var(--border);
@@ -712,13 +893,9 @@
     margin-bottom: 20px;
     box-shadow: var(--brutal-shadow);
   }
-  #map {
-    width: 100%;
-    height: 400px;
-  }
-  @media (max-width: 600px) {
-    #map { height: 300px; }
-  }
+  #map { width: 100%; height: 400px; }
+  @media (max-width: 600px) { #map { height: 300px; } }
+
   .map-header {
     display: flex;
     align-items: center;
@@ -745,9 +922,14 @@
     transition: all 0.2s;
     box-shadow: 2px 2px 0 var(--border);
   }
-  .map-toggle:hover { border-color: var(--accent); color: var(--text); transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--accent); }
+  .map-toggle:hover {
+    border-color: var(--accent);
+    color: var(--text);
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 var(--accent);
+  }
 
-  /* Leaflet popup styling */
+  /* Leaflet popup */
   .leaflet-popup-content-wrapper {
     background: var(--surface) !important;
     border: 2px solid var(--border) !important;
@@ -764,241 +946,325 @@
   .leaflet-popup-close-button { color: var(--text-muted) !important; font-size: 18px !important; }
   .leaflet-popup-close-button:hover { color: var(--text) !important; }
 
-  /* ── Website button ── */
-  .website-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    background: rgba(108, 140, 255, 0.1);
-    border: 1px solid rgba(108, 140, 255, 0.3);
-    border-radius: 6px;
-    padding: 5px 12px;
-    font-size: 12px;
-    color: var(--accent);
-    text-decoration: none;
-    font-weight: 500;
-    transition: all 0.2s;
-    margin-top: 6px;
-  }
-  .website-btn:hover {
-    background: rgba(108, 140, 255, 0.2);
-    border-color: var(--accent);
-    box-shadow: 0 0 8px rgba(108, 140, 255, 0.3);
-  }
-  .website-unavailable {
-    font-size: 11px;
-    color: #5a5f73;
-    margin-top: 6px;
-    font-style: italic;
-  }
-
   /* ── Result card highlight ── */
   .result-card.highlighted {
     border-color: var(--accent) !important;
     box-shadow: 0 0 0 3px var(--accent-glow), var(--brutal-shadow-hover) !important;
-    transition: border-color 0.3s, box-shadow 0.3s;
   }
 
-  /* ── Map marker pulse animation ── */
-  .marker-active {
-    animation: marker-pulse 1s ease-in-out 1;
-  }
+  /* ── Map marker pulse ── */
   @keyframes marker-pulse {
     0% { transform: scale(1); }
     50% { transform: scale(1.3); }
     100% { transform: scale(1); }
   }
+
+  /* ════════════════════════════════════════════
+     ERROR
+     ════════════════════════════════════════════ */
+  .error-box {
+    background: rgba(240, 87, 87, 0.1);
+    border: 2px solid rgba(240, 87, 87, 0.3);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    color: var(--red);
+    font-size: 13px;
+    margin-bottom: 12px;
+    box-shadow: 3px 3px 0 rgba(240, 87, 87, 0.15);
+  }
+
+  /* ── Empty state ── */
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+  }
+  .empty-state h3 { font-size: 16px; color: var(--text); margin-bottom: 8px; }
+  .empty-state p { font-size: 13px; max-width: 380px; margin: 0 auto 16px; }
+
+  /* ── Scoring reference ── */
+  .scoring-ref {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .scoring-ref summary {
+    cursor: pointer;
+    color: var(--accent);
+    font-weight: 500;
+    user-select: none;
+    margin-bottom: 6px;
+  }
+  .scoring-ref table { width: 100%; margin-top: 8px; border-collapse: collapse; }
+  .scoring-ref th, .scoring-ref td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+  .scoring-ref th { color: #5a5f73; font-weight: 500; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border); }
+
+  /* ── Utility ── */
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+  .hidden { display: none !important; }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .landing-logo { font-size: 36px; }
+    .landing-tagline { font-size: 18px; }
+    .landing-desc { font-size: 14px; }
+    .landing-cta { padding: 14px 28px; font-size: 15px; }
+    .nlp-input { font-size: 15px; padding: 14px 16px; }
+    .nlp-submit { padding: 14px 20px; font-size: 13px; }
+    .header-tagline { display: none; }
+    .container { padding: 16px 12px 32px; }
+  }
 </style>
 </head>
 <body>
 
-<header class="header">
-  <div class="logo">Local<span>Lens</span></div>
-  <div class="header-tagline">Real local discovery · Powered by OpenStreetMap</div>
-</header>
-
-<div class="container" id="app">
-  <!-- Intro / splash screen -->
-  <div id="splash" class="intro-splash">
-    <h2>What can I do right now?</h2>
-    <p>
-      Tell <strong>LocalLens</strong> where you are, what you have to spend, and what you're in the mood for.
-      It finds <strong>real places</strong> near you — cafes, parks, museums, bars, libraries, shops, and more —
-      all from <strong>OpenStreetMap</strong>, the world's free and open map.
+<!-- ════════════════════════════════════════════
+     VIEW: LANDING
+     ════════════════════════════════════════════ -->
+<div id="view-landing" class="view active">
+  <div class="landing-bg"></div>
+  <div class="landing-content">
+    <div class="landing-logo">Local<span>Lens</span></div>
+    <div class="landing-tagline">What can I do right now?</div>
+    <p class="landing-desc">
+      Tell LocalLens what you're looking for — food, culture, nightlife, anything —
+      and it finds <strong>real places</strong> near you, scored and ranked so you
+      always know <strong>why</strong> something was recommended.
     </p>
-    <p style="font-size:13px; color:var(--text-muted);">
-      Every result shows <strong>why it was ranked</strong> where it was —
-      distance, budget, time, interests, and whether it suits you alone or with others.
-      Results are marked as <span style="color:var(--green)">verified</span> (from map data),
-      <span style="color:var(--yellow)">estimated</span> (derived), or <span style="color:var(--text-muted)">unknown</span>.
-    </p>
-  </div>
-
-  <!-- Search form -->
-  <div id="searchForm" class="card">
-    <h2>Where are you and what do you have?</h2>
-    <div class="form-grid">
-      <div class="field full">
-        <label for="location">Location <span class="hint">— city, neighbourhood, or address</span></label>
-        <input type="text" id="location" placeholder="e.g. Accra, Ghana / Shoreditch, London / Downtown LA" autocomplete="off">
-      </div>
-
-      <div class="field">
-        <label for="budget">Budget <span class="hint">— how much you're willing to spend</span></label>
-        <input type="number" id="budget" placeholder="100" min="0" step="1">
-      </div>
-
-      <div class="field">
-        <label for="budgetCurrency">Currency</label>
-        <select id="budgetCurrency">
-          <option value="USD">USD ($)</option>
-          <option value="EUR">EUR (€)</option>
-          <option value="GBP">GBP (£)</option>
-          <option value="GHS">GHS (GH₵)</option>
-          <option value="NGN">NGN (₦)</option>
-          <option value="KES">KES (KSh)</option>
-          <option value="ZAR">ZAR (R)</option>
-          <option value="AUD">AUD (A$)</option>
-          <option value="CAD">CAD (C$)</option>
-          <option value="INR">INR (₹)</option>
-          <option value="JPY">JPY (¥)</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label for="timeAvailable">Time available <span class="hint">— hours free</span></label>
-        <input type="number" id="timeAvailable" placeholder="3" min="0.5" step="0.5">
-      </div>
-
-      <div class="field">
-        <label for="maxDistance">Max distance <span class="hint">— km you're willing to travel</span></label>
-        <input type="number" id="maxDistance" placeholder="5" min="0.5" step="0.5">
-      </div>
-
-      <div class="field full">
-        <label>Interests <span class="hint">— tap what you're in the mood for (multiple ok)</span></label>
-        <div class="checkbox-group" id="interestsContainer">
-          <label class="checkbox-item"><input type="checkbox" value="food" checked> Food</label>
-          <label class="checkbox-item"><input type="checkbox" value="drinks"> Drinks</label>
-          <label class="checkbox-item"><input type="checkbox" value="culture"> Culture</label>
-          <label class="checkbox-item"><input type="checkbox" value="art"> Art</label>
-          <label class="checkbox-item"><input type="checkbox" value="music"> Music</label>
-          <label class="checkbox-item"><input type="checkbox" value="history"> History</label>
-          <label class="checkbox-item"><input type="checkbox" value="outdoors"> Outdoors</label>
-          <label class="checkbox-item"><input type="checkbox" value="nature"> Nature</label>
-          <label class="checkbox-item"><input type="checkbox" value="sports"> Sports</label>
-          <label class="checkbox-item"><input type="checkbox" value="shopping"> Shopping</label>
-          <label class="checkbox-item"><input type="checkbox" value="party"> Party</label>
-          <label class="checkbox-item"><input type="checkbox" value="relax"> Relax</label>
-          <label class="checkbox-item"><input type="checkbox" value="learning"> Learning</label>
-          <label class="checkbox-item"><input type="checkbox" value="family"> Family</label>
-          <label class="checkbox-item"><input type="checkbox" value="nightlife"> Nightlife</label>
-        </div>
-      </div>
-
-      <div class="field">
-        <label>Going alone?</label>
-        <div style="display:flex; gap:8px;">
-          <label class="checkbox-item" style="flex:1; justify-content:center;">
-            <input type="radio" name="alone" value="true" checked> Yes, solo
-          </label>
-          <label class="checkbox-item" style="flex:1; justify-content:center;">
-            <input type="radio" name="alone" value="false"> With others
-          </label>
-        </div>
-      </div>
-
-      <div class="field">
-        <label for="startTime">Available from <span class="hint">— optional</span></label>
-        <input type="time" id="startTime">
-      </div>
-    </div>
-
-    <button class="btn" id="searchBtn">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="8"/>
-        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    <button class="landing-cta" id="landingCta">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
-      Find things to do
+      Find Things Near Me
     </button>
+    <div class="landing-badges">
+      <div class="landing-badge"><span class="dot"></span> Powered by OpenStreetMap</div>
+      <div class="landing-badge">🌍 Works globally</div>
+      <div class="landing-badge">🔒 No tracking</div>
+    </div>
   </div>
+</div>
 
-  <!-- Results area -->
-  <div id="resultsArea" class="hidden">
-    <div class="card">
-      <div class="results-header">
-        <div class="results-count" id="resultsCount"></div>
-        <button class="btn btn-secondary btn-small" id="clearResultsBtn" style="margin:0;">Clear</button>
+<!-- ════════════════════════════════════════════
+     VIEW: SEARCH
+     ════════════════════════════════════════════ -->
+<div id="view-search" class="view">
+  <header class="header">
+    <div class="logo" id="logoLink">Local<span>Lens</span></div>
+    <div class="header-tagline">Real local discovery · Powered by OpenStreetMap</div>
+  </header>
+
+  <div class="container" id="app">
+    <!-- Location bar -->
+    <div class="location-bar" id="locationBar">
+      <div class="location-pending" id="locationPending">
+        <div class="spinner"></div>
+        <span>Detecting your location...</span>
       </div>
-      <div id="resultsList"></div>
-      <div id="coverageNote" class="coverage-note hidden"></div>
+      <div class="location-chip hidden" id="locationChip" title="Click to change location">
+        <span class="loc-icon">📍</span>
+        <span class="loc-text" id="locationText"></span>
+        <span class="loc-change">change</span>
+      </div>
+      <div class="location-manual" id="locationManual">
+        <input type="text" id="manualLocationInput" placeholder="Enter city or address..." autocomplete="off">
+        <button class="location-confirm-btn" id="manualLocationBtn">Set Location</button>
+      </div>
     </div>
 
-    <!-- Refinement bar -->
-    <div id="refinementSection" class="card">
-      <h2 style="margin-bottom:10px;">Refine the results</h2>
-      <div class="refinement-bar">
-        <div class="refinement-input">
-          <input type="text" id="refinementInput" placeholder="Try: &quot;Make it cheaper&quot; or &quot;Nothing involving food&quot; or &quot;After 8pm&quot; or &quot;Top 3&quot;" autocomplete="off">
+    <!-- NLP Search -->
+    <div class="nlp-search-section">
+      <div class="nlp-search-bar">
+        <div class="nlp-input-wrap">
+          <input type="text" class="nlp-input" id="nlpInput"
+                 placeholder="What are you looking for? Try &quot;things to do tonight&quot; or &quot;best coffee near me&quot;"
+                 autocomplete="off">
         </div>
-        <button class="btn btn-secondary btn-small" id="refineBtn" style="margin:0; width:auto;">Refine</button>
+        <button class="nlp-submit" id="nlpSubmit">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:6px;">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          Find Things
+        </button>
       </div>
-      <div class="quick-refinements">
-        <span class="quick-pill" data-refine="Make it cheaper.">Cheaper</span>
-        <span class="quick-pill" data-refine="Nothing involving food.">No food</span>
-        <span class="quick-pill" data-refine="Something I can do after 8pm.">After 8pm</span>
-        <span class="quick-pill" data-refine="I'm willing to travel farther.">Go farther</span>
-        <span class="quick-pill" data-refine="Give me your top 3.">Top 3</span>
-        <span class="quick-pill" data-refine="Something more cultural.">More cultural</span>
-        <span class="quick-pill" data-refine="Something outdoors.">Outdoors</span>
-        <span class="quick-pill" data-refine="Something quick, under an hour.">Quick</span>
+
+      <!-- Advanced toggle -->
+      <button class="advanced-toggle" id="advancedToggle">
+        <span class="arrow">▶</span> More options
+      </button>
+    </div>
+
+    <!-- Advanced options panel -->
+    <div class="advanced-panel" id="advancedPanel">
+      <div class="advanced-inner">
+        <h3>Advanced Options</h3>
+        <div class="form-grid">
+          <div class="field">
+            <label for="budget">Budget <span class="hint">— how much to spend</span></label>
+            <input type="number" id="budget" placeholder="100" min="0" step="1">
+          </div>
+          <div class="field">
+            <label for="budgetCurrency">Currency</label>
+            <select id="budgetCurrency">
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="GBP">GBP (£)</option>
+              <option value="GHS">GHS (GH₵)</option>
+              <option value="NGN">NGN (₦)</option>
+              <option value="KES">KES (KSh)</option>
+              <option value="ZAR">ZAR (R)</option>
+              <option value="AUD">AUD (A$)</option>
+              <option value="CAD">CAD (C$)</option>
+              <option value="INR">INR (₹)</option>
+              <option value="JPY">JPY (¥)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="timeAvailable">Time available <span class="hint">— hours free</span></label>
+            <input type="number" id="timeAvailable" placeholder="3" min="0.5" step="0.5">
+          </div>
+          <div class="field">
+            <label for="maxDistance">Max distance <span class="hint">— km you'll travel</span></label>
+            <input type="number" id="maxDistance" placeholder="5" min="0.5" step="0.5">
+          </div>
+          <div class="field full">
+            <label>Interests <span class="hint">— tap what you're in the mood for</span></label>
+            <div class="checkbox-group" id="interestsContainer">
+              <label class="checkbox-item"><input type="checkbox" value="food" checked> Food</label>
+              <label class="checkbox-item"><input type="checkbox" value="drinks"> Drinks</label>
+              <label class="checkbox-item"><input type="checkbox" value="culture"> Culture</label>
+              <label class="checkbox-item"><input type="checkbox" value="art"> Art</label>
+              <label class="checkbox-item"><input type="checkbox" value="music"> Music</label>
+              <label class="checkbox-item"><input type="checkbox" value="history"> History</label>
+              <label class="checkbox-item"><input type="checkbox" value="outdoors"> Outdoors</label>
+              <label class="checkbox-item"><input type="checkbox" value="nature"> Nature</label>
+              <label class="checkbox-item"><input type="checkbox" value="sports"> Sports</label>
+              <label class="checkbox-item"><input type="checkbox" value="shopping"> Shopping</label>
+              <label class="checkbox-item"><input type="checkbox" value="party"> Party</label>
+              <label class="checkbox-item"><input type="checkbox" value="relax"> Relax</label>
+              <label class="checkbox-item"><input type="checkbox" value="learning"> Learning</label>
+              <label class="checkbox-item"><input type="checkbox" value="family"> Family</label>
+              <label class="checkbox-item"><input type="checkbox" value="nightlife"> Nightlife</label>
+            </div>
+          </div>
+          <div class="field">
+            <label>Going alone?</label>
+            <div style="display:flex; gap:8px;">
+              <label class="checkbox-item" style="flex:1; justify-content:center;">
+                <input type="radio" name="alone" value="true" checked> Yes, solo
+              </label>
+              <label class="checkbox-item" style="flex:1; justify-content:center;">
+                <input type="radio" name="alone" value="false"> With others
+              </label>
+            </div>
+          </div>
+          <div class="field">
+            <label for="startTime">Available from <span class="hint">— optional</span></label>
+            <input type="time" id="startTime">
+          </div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Map -->
-  <div id="mapContainer" class="hidden">
-    <div class="map-header">
-      <h3>📍 Discovered Locations</h3>
-      <button class="map-toggle" id="mapToggle">Hide Map</button>
+    <!-- Error -->
+    <div id="errorBox" class="error-box hidden"></div>
+
+    <!-- Results area -->
+    <div id="resultsArea" class="hidden">
+      <div id="suggestionChips" class="suggestion-chips hidden"></div>
+      <div class="card" style="background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;box-shadow:var(--shadow);">
+        <div class="results-header">
+          <div class="results-count" id="resultsCount"></div>
+          <button class="btn-secondary btn-small" id="clearResultsBtn" style="margin:0;">Clear</button>
+        </div>
+        <div id="resultsList"></div>
+        <div id="coverageNote" class="coverage-note hidden"></div>
+      </div>
+
+      <!-- Refinement -->
+      <div id="refinementSection" class="card" style="background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;box-shadow:var(--shadow);">
+        <h3 style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Refine the results</h3>
+        <div class="refinement-bar">
+          <div class="refinement-input">
+            <input type="text" id="refinementInput" placeholder='Try: "Make it cheaper" or "Nothing involving food" or "After 8pm"' autocomplete="off">
+          </div>
+          <button class="btn-secondary btn-small" id="refineBtn" style="margin:0; width:auto;">Refine</button>
+        </div>
+        <div class="quick-refinements">
+          <span class="quick-pill" data-refine="Make it cheaper.">Cheaper</span>
+          <span class="quick-pill" data-refine="Nothing involving food.">No food</span>
+          <span class="quick-pill" data-refine="Something I can do after 8pm.">After 8pm</span>
+          <span class="quick-pill" data-refine="I'm willing to travel farther.">Go farther</span>
+          <span class="quick-pill" data-refine="Give me your top 3.">Top 3</span>
+          <span class="quick-pill" data-refine="Something more cultural.">More cultural</span>
+          <span class="quick-pill" data-refine="Something outdoors.">Outdoors</span>
+          <span class="quick-pill" data-refine="Something quick, under an hour.">Quick</span>
+        </div>
+      </div>
     </div>
-    <div id="map"></div>
-  </div>
 
-  <!-- Loading — Uiverse bright-firefox-37 inspired dots loader -->
-  <div id="loading" class="hidden loading">
-    <div class="loader-dots">
-      <div class="dot"></div>
-      <div class="dot"></div>
-      <div class="dot"></div>
-      <div class="dot"></div>
-      <div class="dot"></div>
+    <!-- Map -->
+    <div id="mapContainer" class="hidden">
+      <div class="map-header">
+        <h3>📍 Discovered Locations</h3>
+        <button class="map-toggle" id="mapToggle">Hide Map</button>
+      </div>
+      <div id="map"></div>
     </div>
-    <span class="loader-text">Searching OpenStreetMap for places near you...</span>
+
+    <!-- Scoring reference -->
+    <details class="scoring-ref" id="scoringRef">
+      <summary>How the scoring works</summary>
+      <table>
+        <tr><th>Factor</th><th>Weight</th><th>What it means</th></tr>
+        <tr><td>Distance</td><td>20%</td><td>Closer places score higher.</td></tr>
+        <tr><td>Budget</td><td>25%</td><td>How well the cost fits your budget.</td></tr>
+        <tr><td>Time fit</td><td>20%</td><td>Duration vs your available time.</td></tr>
+        <tr><td>Interests</td><td>25%</td><td>Category + keyword match to interests.</td></tr>
+        <tr><td>Companion</td><td>10%</td><td>Solo vs group suitability.</td></tr>
+      </table>
+    </details>
   </div>
+</div>
 
-  <!-- Error -->
-  <div id="errorBox" class="hidden error-box"></div>
+<!-- ════════════════════════════════════════════
+     VIEW: LOADING
+     ════════════════════════════════════════════ -->
+<div id="view-loading" class="view">
+  <div class="loader-dots">
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+  </div>
+  <span class="loader-text" id="loaderText">Searching OpenStreetMap for places near you...</span>
+  <span class="loader-tip" id="loaderTip"></span>
+</div>
 
-  <!-- Scoring reference -->
-  <details class="scoring-ref" id="scoringRef">
-    <summary>How the scoring works</summary>
-    <table>
-      <tr><th>Factor</th><th>Weight</th><th>What it means</th></tr>
-      <tr><td>Distance</td><td>20%</td><td>Closer places score higher. Degrades linearly with distance.</td></tr>
-      <tr><td>Budget</td><td>25%</td><td>How well the estimated cost fits your budget. Under 50% of budget = full marks.</td></tr>
-      <tr><td>Time fit</td><td>20%</td><td>Estimated duration vs your available time. Fits comfortably = full marks.</td></tr>
-      <tr><td>Interests</td><td>25%</td><td>Direct category match + keyword match against your selected interests.</td></tr>
-      <tr><td>Companion</td><td>10%</td><td>Solo-friendly vs group-friendly categories, matched to your situation.</td></tr>
-    </table>
-    <p style="margin-top:8px;"><strong>Confidence levels:</strong></p>
-    <table>
-      <tr><th>Tier</th><th>Meaning</th></tr>
-      <tr><td style="color:var(--green);">✓ Verified</td><td>Name, location, and category from OpenStreetMap data directly.</td></tr>
-      <tr><td style="color:var(--yellow);">○ Estimated</td><td>Cost tier or other info derived from typical values (no price data in OSM).</td></tr>
-      <tr><td style="color:var(--text-muted);">? Unknown</td><td>Insufficient data — treat as a rough suggestion.</td></tr>
-    </table>
-  </details>
+<!-- ════════════════════════════════════════════
+     GEOLOCATION CONFIRM OVERLAY
+     ════════════════════════════════════════════ -->
+<div class="geo-overlay" id="geoOverlay">
+  <div class="geo-overlay-card">
+    <h3>📍 Location detected</h3>
+    <p>We found your location using your browser.</p>
+    <div class="detected-loc" id="detectedLocText"></div>
+    <div class="geo-overlay-actions">
+      <button class="landing-cta" id="geoUseBtn" style="font-size:14px;padding:12px 24px;">Use this location</button>
+      <button class="btn-secondary" id="geoChangeBtn">Change location</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -1006,67 +1272,412 @@
   'use strict';
 
   const API = '/api';
+  const hasGSAP = typeof gsap !== 'undefined';
 
-  // ── State ──
+  // ════════════════════════════════════════════
+  // STATE
+  // ════════════════════════════════════════════
+  let currentView = 'landing';
+  let userLat = null;
+  let userLon = null;
+  let userLocationName = null;
   let lastResults = [];
   let lastQuery = null;
+  let map = null;
+  let markers = [];
+  let mapVisible = true;
+  let geoResolved = false;
 
-  // ── DOM refs ──
+  // ════════════════════════════════════════════
+  // DOM REFS
+  // ════════════════════════════════════════════
   const $ = id => document.getElementById(id);
-  const splash = $('splash');
-  const searchForm = $('searchForm');
-  const searchBtn = $('searchBtn');
-  const location = $('location');
-  const budget = $('budget');
-  const budgetCurrency = $('budgetCurrency');
-  const timeAvailable = $('timeAvailable');
-  const maxDistance = $('maxDistance');
-  const startTime = $('startTime');
-  const interestsContainer = $('interestsContainer');
+
+  const viewLanding = $('view-landing');
+  const viewSearch = $('view-search');
+  const viewLoading = $('view-loading');
+  const landingCta = $('landingCta');
+  const logoLink = $('logoLink');
+  const locationBar = $('locationBar');
+  const locationPending = $('locationPending');
+  const locationChip = $('locationChip');
+  const locationText = $('locationText');
+  const locationManual = $('locationManual');
+  const manualLocationInput = $('manualLocationInput');
+  const manualLocationBtn = $('manualLocationBtn');
+  const nlpInput = $('nlpInput');
+  const nlpSubmit = $('nlpSubmit');
+  const advancedToggle = $('advancedToggle');
+  const advancedPanel = $('advancedPanel');
+  const errorBox = $('errorBox');
   const resultsArea = $('resultsArea');
   const resultsList = $('resultsList');
   const resultsCount = $('resultsCount');
   const coverageNote = $('coverageNote');
-  const loading = $('loading');
-  const errorBox = $('errorBox');
+  const suggestionChips = $('suggestionChips');
   const refineInput = $('refinementInput');
   const refineBtn = $('refineBtn');
   const clearResultsBtn = $('clearResultsBtn');
-  const scoringRef = $('scoringRef');
   const mapContainer = $('mapContainer');
   const mapToggle = $('mapToggle');
+  const geoOverlay = $('geoOverlay');
+  const detectedLocText = $('detectedLocText');
+  const geoUseBtn = $('geoUseBtn');
+  const geoChangeBtn = $('geoChangeBtn');
+  const loaderText = $('loaderText');
+  const loaderTip = $('loaderTip');
 
-  // ── Map state ──
-  let map = null;
-  let markers = [];
-  let mapVisible = true;
+  // ════════════════════════════════════════════
+  // VIEW MANAGER
+  // ════════════════════════════════════════════
+  function showView(name, animate) {
+    const views = { landing: viewLanding, search: viewSearch, loading: viewLoading };
+    const target = views[name];
+    if (!target) return;
 
-  // ── Helpers ──
+    if (animate && hasGSAP && currentView !== name) {
+      // Fade out current
+      const current = views[currentView];
+      if (current) {
+        gsap.to(current, {
+          opacity: 0,
+          duration: 0.25,
+          onComplete: () => {
+            current.classList.remove('active');
+            current.style.opacity = '';
+            target.classList.add('active');
+            target.style.opacity = 0;
+            gsap.to(target, { opacity: 1, duration: 0.3 });
+            if (name === 'search') animateSearchEntrance();
+          }
+        });
+      } else {
+        target.classList.add('active');
+      }
+    } else {
+      Object.values(views).forEach(v => v.classList.remove('active'));
+      target.classList.add('active');
+    }
+    currentView = name;
+  }
+
+  function animateSearchEntrance() {
+    if (!hasGSAP) return;
+    gsap.from('.nlp-search-section', { y: 20, opacity: 0, duration: 0.4, delay: 0.1 });
+    gsap.from('.location-bar', { y: 15, opacity: 0, duration: 0.4, delay: 0.05 });
+  }
+
+  // ════════════════════════════════════════════
+  // GEOLOCATION MODULE
+  // ════════════════════════════════════════════
+  function initGeolocation() {
+    if (!navigator.geolocation) {
+      showManualLocation();
+      return;
+    }
+
+    locationPending.classList.remove('hidden');
+    locationChip.classList.add('hidden');
+    locationManual.classList.remove('visible');
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        userLat = pos.coords.latitude;
+        userLon = pos.coords.longitude;
+        // Reverse geocode via backend (use coordinates as location string)
+        try {
+          const resp = await fetch(`${API}/recommend`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              location: `${userLat},${userLon}`,
+              budget: 0, interests: [], alone: true, max_distance_km: 0.1
+            })
+          });
+          // We just need the geocoded name from the error or success
+          // Actually, let's just show coords and let the user confirm
+          userLocationName = `${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
+        } catch (e) {
+          userLocationName = `${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
+        }
+
+        locationPending.classList.add('hidden');
+        showGeoConfirm();
+      },
+      (err) => {
+        locationPending.classList.add('hidden');
+        showManualLocation();
+      },
+      { timeout: 8000, maximumAge: 300000 }
+    );
+  }
+
+  function showGeoConfirm() {
+    detectedLocText.textContent = userLocationName;
+    geoOverlay.classList.add('visible');
+    if (hasGSAP) {
+      gsap.from('.geo-overlay-card', { scale: 0.9, opacity: 0, duration: 0.3 });
+    }
+  }
+
+  function confirmGeoLocation() {
+    geoOverlay.classList.remove('visible');
+    locationChip.classList.remove('hidden');
+    locationText.textContent = userLocationName;
+    geoResolved = true;
+  }
+
+  function showManualLocation() {
+    locationPending.classList.add('hidden');
+    locationChip.classList.add('hidden');
+    locationManual.classList.add('visible');
+    manualLocationInput.focus();
+  }
+
+  function setManualLocation() {
+    const val = manualLocationInput.value.trim();
+    if (!val) return;
+    userLocationName = val;
+    userLat = null;
+    userLon = null;
+    locationManual.classList.remove('visible');
+    locationChip.classList.remove('hidden');
+    locationText.textContent = val;
+    geoResolved = true;
+  }
+
+  // ════════════════════════════════════════════
+  // NLP PARSER MODULE
+  // ════════════════════════════════════════════
+
+  // Keyword → category mappings
+  const CATEGORY_KEYWORDS = {
+    food: ['restaurant', 'food', 'eat', 'dinner', 'lunch', 'brunch', 'meal', 'cuisine', 'hungry', 'bite', 'snack'],
+    drinks: ['drink', 'drinks', 'cocktail', 'beer', 'wine', 'bar', 'pub', 'brewery', 'tap'],
+    culture: ['culture', 'cultural', 'museum', 'gallery', 'exhibit', 'exhibition', 'theatre', 'theater', 'cinema', 'show', 'performance', 'play'],
+    art: ['art', 'arts', 'painting', 'sculpture', 'creative', 'studio', 'gallery', 'exhibit'],
+    music: ['music', 'concert', 'live music', 'band', 'dj', 'gig', 'jazz', 'karaoke'],
+    history: ['history', 'historic', 'heritage', 'ancient', 'monument', 'archaeological', 'old town'],
+    outdoors: ['outdoor', 'outdoors', 'park', 'walk', 'hike', 'hiking', 'trail', 'fresh air', 'green', 'garden', 'nature'],
+    nature: ['nature', 'wildlife', 'animal', 'forest', 'lake', 'river', 'beach', 'waterfall', 'garden'],
+    sports: ['sport', 'sports', 'exercise', 'workout', 'gym', 'fitness', 'running', 'swimming', 'tennis', 'football', 'soccer'],
+    shopping: ['shop', 'shopping', 'buy', 'market', 'mall', 'store', 'browse', 'souvenir', 'bazaar'],
+    party: ['party', 'parties', 'dance', 'club', 'nightlife', 'rave', 'celebrate'],
+    relax: ['relax', 'chill', 'quiet', 'peaceful', 'calm', 'coffee', 'cafe', 'lounge', 'spa'],
+    learning: ['learn', 'study', 'library', 'class', 'workshop', 'lecture', 'education', 'university'],
+    family: ['kids', 'children', 'family', 'child', 'playground', 'zoo', 'fun for kids'],
+    nightlife: ['nightlife', 'night', 'late night', 'after dark', 'clubs', 'drinks']
+  };
+
+  // Time-of-day keywords
+  const TIME_KEYWORDS = {
+    morning: ['morning', 'early', 'breakfast', 'sunrise', 'dawn', 'before noon', 'before 12'],
+    afternoon: ['afternoon', 'lunch', 'midday', 'noon'],
+    evening: ['evening', 'tonight', 'dinner', 'sunset', 'after work', 'after 5', 'after 6', 'after 7', 'after 8', 'after 9', 'late'],
+    weekend: ['weekend', 'saturday', 'sunday', 'this weekend']
+  };
+
+  // Budget keywords
+  const BUDGET_KEYWORDS = {
+    cheap: ['cheap', 'free', 'budget', 'affordable', 'inexpensive', 'low cost', 'no cost', 'under $'],
+    expensive: ['fancy', 'upscale', 'expensive', 'premium', 'luxury', 'splurge', 'high end', 'fine dining']
+  };
+
+  // Distance keywords
+  const DISTANCE_KEYWORDS = {
+    close: ['near me', 'nearby', 'close', 'walking distance', 'around the corner', 'close by'],
+    far: ['far', 'worth the trip', 'willing to travel', 'drive', 'a bit further']
+  };
+
+  // Companion keywords
+  const COMPANION_KEYWORDS = {
+    date: ['date', 'romantic', 'couple', 'anniversary', 'valentine'],
+    family: ['kids', 'children', 'family', 'child-friendly', 'with kids'],
+    group: ['friends', 'group', 'party', 'together', 'social', 'with people']
+  };
+
+  function parseNLP(query) {
+    const q = query.toLowerCase().trim();
+    const result = {
+      interests: [],
+      timeHint: null,
+      budgetHint: null,
+      distanceHint: null,
+      companionHint: null,
+      budgetAmount: null,
+      rawQuery: query
+    };
+
+    // Extract categories
+    for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+      for (const kw of keywords) {
+        if (q.includes(kw)) {
+          if (!result.interests.includes(cat)) result.interests.push(cat);
+          break;
+        }
+      }
+    }
+
+    // Extract time hints
+    for (const [time, keywords] of Object.entries(TIME_KEYWORDS)) {
+      for (const kw of keywords) {
+        if (q.includes(kw)) {
+          result.timeHint = time;
+          break;
+        }
+      }
+    }
+
+    // Extract budget hints
+    for (const [hint, keywords] of Object.entries(BUDGET_KEYWORDS)) {
+      for (const kw of keywords) {
+        if (q.includes(kw)) {
+          result.budgetHint = hint;
+          break;
+        }
+      }
+    }
+
+    // Extract numeric budget: "$20", "under 50", "under $30"
+    const budgetMatch = q.match(/(?:under\s*\$?|around\s*\$?|about\s*\$?|\$)\s*(\d+)/);
+    if (budgetMatch) {
+      result.budgetAmount = parseInt(budgetMatch[1]);
+    }
+
+    // Extract distance hints
+    for (const [hint, keywords] of Object.entries(DISTANCE_KEYWORDS)) {
+      for (const kw of keywords) {
+        if (q.includes(kw)) {
+          result.distanceHint = hint;
+          break;
+        }
+      }
+    }
+
+    // Extract companion hints
+    for (const [hint, keywords] of Object.entries(COMPANION_KEYWORDS)) {
+      for (const kw of keywords) {
+        if (q.includes(kw)) {
+          result.companionHint = hint;
+          break;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  function nlpToSearchBody(parsed) {
+    const body = {
+      location: userLocationName || '',
+      budget: 0,
+      budget_currency: $('budgetCurrency').value,
+      time_available_hours: 0,
+      interests: [],
+      alone: true,
+      max_distance_km: 5,
+      start_time: null
+    };
+
+    // Apply NLP interests (use them, fall back to checked checkboxes)
+    if (parsed.interests.length > 0) {
+      body.interests = parsed.interests;
+    } else {
+      body.interests = getInterests();
+    }
+
+    // Apply NLP budget
+    if (parsed.budgetAmount) {
+      body.budget = parsed.budgetAmount;
+    } else {
+      body.budget = parseFloat($('budget').value) || 0;
+    }
+
+    if (parsed.budgetHint === 'cheap') {
+      if (body.budget === 0) body.budget = 15;
+    } else if (parsed.budgetHint === 'expensive') {
+      if (body.budget === 0) body.budget = 80;
+    }
+
+    // Apply NLP distance
+    if (parsed.distanceHint === 'close') {
+      body.max_distance_km = 2;
+    } else if (parsed.distanceHint === 'far') {
+      body.max_distance_km = 10;
+    } else {
+      body.max_distance_km = parseFloat($('maxDistance').value) || 5;
+    }
+
+    // Apply NLP time
+    if (parsed.timeHint === 'morning' || parsed.timeHint === 'afternoon') {
+      body.time_available_hours = parseFloat($('timeAvailable').value) || 3;
+    } else if (parsed.timeHint === 'evening') {
+      body.time_available_hours = parseFloat($('timeAvailable').value) || 4;
+    } else {
+      body.time_available_hours = parseFloat($('timeAvailable').value) || 3;
+    }
+
+    // Apply NLP companion
+    if (parsed.companionHint === 'date' || parsed.companionHint === 'family') {
+      body.alone = false;
+    } else if (parsed.companionHint === 'group') {
+      body.alone = false;
+    } else {
+      body.alone = getAlone();
+    }
+
+    return body;
+  }
+
+  function generateSuggestions(parsed) {
+    if (parsed.interests.length > 0) return [];
+
+    const suggestions = [
+      'Restaurants nearby',
+      'Things to do tonight',
+      'Free outdoor activities',
+      'Coffee shops for studying'
+    ];
+    return suggestions;
+  }
+
+  // ════════════════════════════════════════════
+  // HELPERS
+  // ════════════════════════════════════════════
   function getInterests() {
-    return Array.from(interestsContainer.querySelectorAll('input[type=checkbox]:checked'))
+    return Array.from($('interestsContainer').querySelectorAll('input[type=checkbox]:checked'))
       .map(cb => cb.value);
   }
 
   function getAlone() {
-    const checked = interestsContainer.closest('.form-grid')
-      .querySelector('input[name=alone]:checked');
+    const checked = document.querySelector('input[name=alone]:checked');
     return checked ? checked.value === 'true' : true;
-  }
-
-  function showLoading(show) {
-    loading.classList.toggle('hidden', !show);
-    searchBtn.disabled = show;
   }
 
   function showError(msg) {
     errorBox.textContent = msg;
     errorBox.classList.remove('hidden');
-    loading.classList.add('hidden');
-    searchBtn.disabled = false;
+    if (hasGSAP) gsap.from(errorBox, { y: -10, opacity: 0, duration: 0.3 });
   }
 
   function hideError() {
     errorBox.classList.add('hidden');
+  }
+
+  function showLoading(show, text) {
+    if (show) {
+      showView('loading', false);
+      if (text) loaderText.textContent = text;
+      loaderTip.textContent = '';
+      // Show a tip after 4 seconds
+      setTimeout(() => {
+        if (currentView === 'loading') {
+          loaderTip.textContent = 'OpenStreetMap coverage can be sparse in some areas. Hang tight...';
+        }
+      }, 4000);
+    } else {
+      showView('search', false);
+    }
   }
 
   function formatScore(score) {
@@ -1092,32 +1703,39 @@
   function fmtCost(est) {
     if (!est || est.amount === undefined) return 'Unknown cost';
     const { amount, currency, tier } = est;
-    const symbols = { USD: '$', EUR: '€', GBP: '£', GHS: 'GH₵', NGN: '₦', KES: 'KSh',
-                      ZAR: 'R', AUD: 'A$', CAD: 'C$', INR: '₹', JPY: '¥' };
+    const symbols = { USD:'$', EUR:'€', GBP:'£', GHS:'GH₵', NGN:'₦', KES:'KSh',
+                      ZAR:'R', AUD:'A$', CAD:'C$', INR:'₹', JPY:'¥' };
     const sym = symbols[currency] || currency + ' ';
     if (tier === 'free') return 'Free';
     return sym + Math.round(amount);
   }
 
-  function confidenceClass(confidence) {
-    if (confidence === 'verified') return 'confidence-verified';
-    if (confidence === 'estimated') return 'confidence-estimated';
+  function confidenceClass(c) {
+    if (c === 'verified') return 'confidence-verified';
+    if (c === 'estimated') return 'confidence-estimated';
     return 'confidence-unknown';
   }
 
-  function confidenceLabel(confidence) {
-    if (confidence === 'verified') return '✓ Verified';
-    if (confidence === 'estimated') return '○ Estimated';
+  function confidenceLabel(c) {
+    if (c === 'verified') return '✓ Verified';
+    if (c === 'estimated') return '○ Estimated';
     return '? Unknown';
   }
 
-  function formatOpeningHours(hours) {
-    if (!hours || hours === 'Unknown' || hours === '') return 'Hours not listed';
-    if (hours.length > 80) return hours.substring(0, 77) + '...';
-    return hours;
+  function formatOpeningHours(h) {
+    if (!h || h === 'Unknown' || h === '') return 'Hours not listed';
+    if (h.length > 80) return h.substring(0, 77) + '...';
+    return h;
   }
 
-  // ── Render results ──
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+  }
+
+  // ════════════════════════════════════════════
+  // RESULTS RENDERER
+  // ════════════════════════════════════════════
   function renderResults(results, query) {
     if (!results || results.length === 0) {
       resultsList.innerHTML = `
@@ -1137,153 +1755,97 @@
       const scoreClass = formatScore(r.score);
       const isTop = (i === 0);
       const rowNum = i + 1;
-      const rankLabel = isTop ? 'Best match' : `#${rowNum}`;
+      const rankLabel = isTop ? 'Best match' : '#' + rowNum;
       const hasCoords = r.lat && r.lon;
 
-      // Website section
       let websiteHtml = '';
       if (r.website) {
-        const safeUrl = escapeHtml(r.website);
-        websiteHtml = `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="website-btn" title="Visit official website">🌐 Visit Website</a>`;
+        websiteHtml = '<a href="' + escapeHtml(r.website) + '" target="_blank" rel="noopener noreferrer" class="website-btn" title="Visit official website">🌐 Visit Website</a>';
       }
 
-      // Map view link
       let mapLinkHtml = '';
       if (hasCoords) {
-        const osmUrl = `https://www.openstreetmap.org/?mlat=${r.lat}&mlon=${r.lon}#map=17/${r.lat}/${r.lon}`;
-        mapLinkHtml = `<a href="${osmUrl}" target="_blank" rel="noopener noreferrer" class="website-btn" style="background:rgba(62,207,142,0.1);border-color:rgba(62,207,142,0.3);color:var(--green);" title="Open in OpenStreetMap">🗺 View on Map</a>`;
+        const osmUrl = 'https://www.openstreetmap.org/?mlat=' + r.lat + '&mlon=' + r.lon + '#map=17/' + r.lat + '/' + r.lon;
+        mapLinkHtml = '<a href="' + osmUrl + '" target="_blank" rel="noopener noreferrer" class="website-btn" style="background:rgba(62,207,142,0.1);border-color:rgba(62,207,142,0.3);color:var(--green);">🗺 View on Map</a>';
       }
 
-      // Address
       const address = r.address && r.address !== 'Location only' ? r.address : '';
 
-      html += `
-        <div class="result-card${isTop ? ' top-match' : ''}" id="card-${i}" ${hasCoords ? `data-lat="${r.lat}" data-lon="${r.lon}"` : ''}>
-          <div class="result-top">
-            <div style="display:flex; align-items:flex-start; gap:10px; flex:1;">
-              <div class="score-ring ${scoreClass}" title="${rankLabel}">
-                ${isTop ? '★' : rowNum}
-              </div>
-              <div>
-                <div class="result-name">${escapeHtml(r.name)}</div>
-                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:4px;">
-                  <span class="result-category">${escapeHtml(r.category)}</span>
-                  <span class="confidence-badge ${confidenceClass(r.confidence)}">
-                    ${confidenceLabel(r.confidence)}
-                  </span>
-                </div>
-                ${address ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">📍 ${escapeHtml(address)}</div>` : ''}
-              </div>
-            </div>
-            <div class="result-score">
-              <div class="score-ring ${scoreClass}">
-                ${r.score.toFixed(1)}
-              </div>
-            </div>
-          </div>
-
-          <div class="result-details">
-            <div class="detail">
-              <span class="label">📍</span>
-              <span class="value">${fmtDistance(r.distance_km)}</span>
-            </div>
-            <div class="detail">
-              <span class="label">⏱</span>
-              <span class="value">${fmtTime(r.estimated_time_hours)}</span>
-            </div>
-            <div class="detail">
-              <span class="label">💰</span>
-              <span class="value">${fmtCost(r.cost_estimate)}</span>
-            </div>
-            <div class="detail">
-              <span class="label">🕐</span>
-              <span class="value">${formatOpeningHours(r.opening_hours)}</span>
-            </div>
-            ${r.phone ? `<div class="detail"><span class="label">📞</span><span class="value">${escapeHtml(r.phone)}</span></div>` : ''}
-          </div>
-
-          <div class="result-why">
-            ${escapeHtml(r.why_it_matches)}
-          </div>
-
-          <div class="breakdown">
-            <div class="breakdown-item">
-              <span>Distance</span>
-              <div class="breakdown-bar"><div class="breakdown-fill" style="width:${(r.breakdown?.distance_score || 0) * 100}%"></div></div>
-              <span>${(r.breakdown?.distance_score || 0).toFixed(2)}</span>
-            </div>
-            <div class="breakdown-item">
-              <span>Budget</span>
-              <div class="breakdown-bar"><div class="breakdown-fill" style="width:${(r.breakdown?.budget_score || 0) * 100}%"></div></div>
-              <span>${(r.breakdown?.budget_score || 0).toFixed(2)}</span>
-            </div>
-            <div class="breakdown-item">
-              <span>Time</span>
-              <div class="breakdown-bar"><div class="breakdown-fill" style="width:${(r.breakdown?.time_score || 0) * 100}%"></div></div>
-              <span>${(r.breakdown?.time_score || 0).toFixed(2)}</span>
-            </div>
-            <div class="breakdown-item">
-              <span>Interests</span>
-              <div class="breakdown-bar"><div class="breakdown-fill" style="width:${(r.breakdown?.interest_score || 0) * 100}%"></div></div>
-              <span>${(r.breakdown?.interest_score || 0).toFixed(2)}</span>
-            </div>
-            <div class="breakdown-item">
-              <span>Companion</span>
-              <div class="breakdown-bar"><div class="breakdown-fill" style="width:${(r.breakdown?.companion_score || 0) * 100}%"></div></div>
-              <span>${(r.breakdown?.companion_score || 0).toFixed(2)}</span>
-            </div>
-          </div>
-
-          <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:6px;">
-            ${websiteHtml}
-            ${mapLinkHtml}
-            <div class="result-source" style="margin-left:auto;">
-              <span class="badge">${escapeHtml(r.source || 'OpenStreetMap')}</span>
-            </div>
-          </div>
-        </div>`;
+      html += '<div class="result-card' + (isTop ? ' top-match' : '') + '" id="card-' + i + '"' + (hasCoords ? ' data-lat="' + r.lat + '" data-lon="' + r.lon + '"' : '') + '>'
+        + '<div class="result-top">'
+        + '<div style="display:flex;align-items:flex-start;gap:10px;flex:1;">'
+        + '<div class="score-ring ' + scoreClass + '" title="' + rankLabel + '">' + (isTop ? '★' : rowNum) + '</div>'
+        + '<div>'
+        + '<div class="result-name">' + escapeHtml(r.name) + '</div>'
+        + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px;">'
+        + '<span class="result-category">' + escapeHtml(r.category) + '</span>'
+        + '<span class="confidence-badge ' + confidenceClass(r.confidence) + '">' + confidenceLabel(r.confidence) + '</span>'
+        + '</div>'
+        + (address ? '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">📍 ' + escapeHtml(address) + '</div>' : '')
+        + '</div></div>'
+        + '<div class="result-score"><div class="score-ring ' + scoreClass + '">' + r.score.toFixed(1) + '</div></div>'
+        + '</div>'
+        + '<div class="result-details">'
+        + '<div class="detail"><span class="label">📍</span><span class="value">' + fmtDistance(r.distance_km) + '</span></div>'
+        + '<div class="detail"><span class="label">⏱</span><span class="value">' + fmtTime(r.estimated_time_hours) + '</span></div>'
+        + '<div class="detail"><span class="label">💰</span><span class="value">' + fmtCost(r.cost_estimate) + '</span></div>'
+        + '<div class="detail"><span class="label">🕐</span><span class="value">' + formatOpeningHours(r.opening_hours) + '</span></div>'
+        + (r.phone ? '<div class="detail"><span class="label">📞</span><span class="value">' + escapeHtml(r.phone) + '</span></div>' : '')
+        + '</div>'
+        + '<div class="result-why">' + escapeHtml(r.why_it_matches) + '</div>'
+        + '<div class="breakdown">'
+        + '<div class="breakdown-item"><span>Distance</span><div class="breakdown-bar"><div class="breakdown-fill" style="width:' + ((r.breakdown?.distance_score||0)*100) + '%"></div></div><span>' + (r.breakdown?.distance_score||0).toFixed(2) + '</span></div>'
+        + '<div class="breakdown-item"><span>Budget</span><div class="breakdown-bar"><div class="breakdown-fill" style="width:' + ((r.breakdown?.budget_score||0)*100) + '%"></div></div><span>' + (r.breakdown?.budget_score||0).toFixed(2) + '</span></div>'
+        + '<div class="breakdown-item"><span>Time</span><div class="breakdown-bar"><div class="breakdown-fill" style="width:' + ((r.breakdown?.time_score||0)*100) + '%"></div></div><span>' + (r.breakdown?.time_score||0).toFixed(2) + '</span></div>'
+        + '<div class="breakdown-item"><span>Interests</span><div class="breakdown-bar"><div class="breakdown-fill" style="width:' + ((r.breakdown?.interest_score||0)*100) + '%"></div></div><span>' + (r.breakdown?.interest_score||0).toFixed(2) + '</span></div>'
+        + '<div class="breakdown-item"><span>Companion</span><div class="breakdown-bar"><div class="breakdown-fill" style="width:' + ((r.breakdown?.companion_score||0)*100) + '%"></div></div><span>' + (r.breakdown?.companion_score||0).toFixed(2) + '</span></div>'
+        + '</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;">'
+        + websiteHtml + mapLinkHtml
+        + '<div class="result-source" style="margin-left:auto;"><span class="badge">' + escapeHtml(r.source || 'OpenStreetMap') + '</span></div>'
+        + '</div></div>';
     });
 
     resultsList.innerHTML = html;
-    resultsCount.textContent = `${results.length} result${results.length !== 1 ? 's' : ''}`;
+    resultsCount.textContent = results.length + ' result' + (results.length !== 1 ? 's' : '') + ' found near ' + escapeHtml(userLocationName || 'your location');
     lastResults = results;
 
     // Coverage note
     if (query && query.coverage) {
       const c = query.coverage;
-      coverageNote.innerHTML = `
-        <strong>Coverage:</strong> ${c.places_found} places found within ${c.search_radius_m/1000} km radius. 
-        Categories: ${escapeHtml(c.categories_found?.join(', ') || 'various')}. 
-        <span style="color:var(--text-muted);">Data from OpenStreetMap contributors (ODbL).</span>
-      `;
+      coverageNote.innerHTML = '<strong>Coverage:</strong> ' + c.places_found + ' places found within ' + (c.search_radius_m/1000) + ' km radius. Categories: ' + escapeHtml(c.categories_found?.join(', ') || 'various') + '. <span style="color:var(--text-muted);">Data from OpenStreetMap contributors (ODbL).</span>';
       coverageNote.classList.remove('hidden');
     } else {
       coverageNote.classList.add('hidden');
     }
 
-    // Initialize or update the map
     initMap(results);
+
+    // GSAP staggered entrance
+    if (hasGSAP) {
+      gsap.from('.result-card', {
+        y: 25,
+        opacity: 0,
+        duration: 0.4,
+        stagger: 0.06,
+        ease: 'power2.out'
+      });
+    }
   }
 
-  // ── Map ──
+  // ════════════════════════════════════════════
+  // MAP MODULE
+  // ════════════════════════════════════════════
   function initMap(results) {
-    const coords = results
-      .filter(r => r.lat && r.lon)
-      .map(r => [r.lat, r.lon]);
-
+    const coords = results.filter(r => r.lat && r.lon).map(r => [r.lat, r.lon]);
     if (coords.length === 0) {
       mapContainer.classList.add('hidden');
       return;
     }
-
     mapContainer.classList.remove('hidden');
 
     if (!map) {
-      map = L.map('map', {
-        zoomControl: true,
-        attributionControl: true,
-      }).setView(coords[0], 14);
-
+      map = L.map('map', { zoomControl: true, attributionControl: true }).setView(coords[0], 14);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19,
@@ -1308,42 +1870,36 @@
 
     results.forEach((r, i) => {
       if (!r.lat || !r.lon) return;
-
       const isTop = (i === 0);
       const markerColor = isTop ? '#6c8cff' : (r.score >= 7 ? '#3ecf8e' : (r.score >= 4 ? '#f0b90b' : '#f05757'));
 
       const icon = L.divIcon({
         className: '',
-        html: `<div style="width:28px;height:28px;border-radius:50%;background:${markerColor};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);">${i + 1}</div>`,
+        html: '<div style="width:28px;height:28px;border-radius:50%;background:' + markerColor + ';border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);">' + (i + 1) + '</div>',
         iconSize: [28, 28],
         iconAnchor: [14, 14],
         popupAnchor: [0, -16],
       });
 
       const marker = L.marker([r.lat, r.lon], { icon }).addTo(map);
-
       const address = r.address && r.address !== 'Location only' ? r.address : '';
-      let popupHtml = `
-        <div>
-          <div class="popup-name">${escapeHtml(r.name)}</div>
-          <div class="popup-category">${escapeHtml(r.category)}</div>
-          ${address ? `<div class="popup-detail">📍 ${escapeHtml(address)}</div>` : ''}
-          <div class="popup-detail">${fmtDistance(r.distance_km)} · ${fmtCost(r.cost_estimate)}</div>
-          ${r.website ? `<div class="popup-detail"><a href="${escapeHtml(r.website)}" target="_blank" rel="noopener noreferrer">🌐 Visit Website</a></div>` : ''}
-          <div class="popup-detail" style="margin-top:4px;"><a href="https://www.openstreetmap.org/?mlat=${r.lat}&mlon=${r.lon}#map=17/${r.lat}/${r.lon}" target="_blank" rel="noopener noreferrer">🗺 Open in OSM</a></div>
-        </div>`;
-
+      let popupHtml = '<div>'
+        + '<div class="popup-name">' + escapeHtml(r.name) + '</div>'
+        + '<div class="popup-category">' + escapeHtml(r.category) + '</div>'
+        + (address ? '<div class="popup-detail">📍 ' + escapeHtml(address) + '</div>' : '')
+        + '<div class="popup-detail">' + fmtDistance(r.distance_km) + ' · ' + fmtCost(r.cost_estimate) + '</div>'
+        + (r.website ? '<div class="popup-detail"><a href="' + escapeHtml(r.website) + '" target="_blank" rel="noopener noreferrer">🌐 Visit Website</a></div>' : '')
+        + '<div class="popup-detail" style="margin-top:4px;"><a href="https://www.openstreetmap.org/?mlat=' + r.lat + '&mlon=' + r.lon + '#map=17/' + r.lat + '/' + r.lon + '" target="_blank" rel="noopener noreferrer">🗺 Open in OSM</a></div>'
+        + '</div>';
       marker.bindPopup(popupHtml, { maxWidth: 280 });
-
       marker.on('click', () => {
-        const card = document.getElementById(`card-${i}`);
+        const card = document.getElementById('card-' + i);
         if (card) {
           card.scrollIntoView({ behavior: 'smooth', block: 'center' });
           card.classList.add('highlighted');
           setTimeout(() => card.classList.remove('highlighted'), 2000);
         }
       });
-
       markers.push(marker);
     });
 
@@ -1353,11 +1909,9 @@
       const bounds = L.latLngBounds(coords);
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
     }
-
     setTimeout(() => map.invalidateSize(), 200);
   }
 
-  // Click result card → focus map marker
   function setupCardClickHandlers() {
     document.querySelectorAll('.result-card[data-lat]').forEach((card, i) => {
       card.style.cursor = 'pointer';
@@ -1368,57 +1922,38 @@
         if (map && lat && lon) {
           map.setView([lat, lon], 17, { animate: true });
           const idx = lastResults.findIndex(r => r.lat === lat && r.lon === lon);
-          if (idx >= 0 && markers[idx]) {
-            markers[idx].openPopup();
-          }
+          if (idx >= 0 && markers[idx]) markers[idx].openPopup();
         }
       });
     });
   }
 
-  function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
-
-  // ── API calls ──
-  async function search() {
+  // ════════════════════════════════════════════
+  // SEARCH
+  // ════════════════════════════════════════════
+  async function doSearch() {
     hideError();
 
-    const loc = location.value.trim();
-    if (!loc) {
-      showError('Please enter a location (city, neighbourhood, or address).');
-      location.focus();
+    if (!geoResolved) {
+      showError('Please set your location first.');
       return;
     }
 
-    const b = parseFloat(budget.value) || 0;
-    const curr = budgetCurrency.value;
-    const t = parseFloat(timeAvailable.value) || 0;
-    const d = parseFloat(maxDistance.value) || 5;
-    const interests = getInterests();
-    const alone = getAlone();
-    const start = startTime.value || null;
+    const query = nlpInput.value.trim();
+    if (!query) {
+      showError('Tell LocalLens what you\'re looking for — e.g. "things to do tonight" or "best coffee near me".');
+      nlpInput.focus();
+      return;
+    }
 
-    const body = {
-      location: loc,
-      budget: b,
-      budget_currency: curr,
-      time_available_hours: t,
-      interests: interests.length > 0 ? interests : [],
-      alone: alone,
-      max_distance_km: d,
-      start_time: start,
-    };
+    const parsed = parseNLP(query);
+    const body = nlpToSearchBody(parsed);
+    body.location = userLocationName;
 
-    showLoading(true);
+    showLoading(true, 'Searching OpenStreetMap for places near you...');
+
     try {
-      const resp = await fetch(`${API}/recommend`, {
+      const resp = await fetch(API + '/recommend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -1426,36 +1961,65 @@
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ detail: 'Unknown error' }));
-        throw new Error(err.detail || `HTTP ${resp.status}`);
+        throw new Error(err.detail || 'HTTP ' + resp.status);
       }
 
       const data = await resp.json();
+      showLoading(false);
       hideError();
       renderResults(data.results, data);
       resultsArea.classList.remove('hidden');
-      splash.classList.add('hidden');
       lastQuery = data.query;
       setupCardClickHandlers();
+
+      // Show suggestion chips for vague queries
+      const suggestions = generateSuggestions(parsed);
+      if (suggestions.length > 0 && data.results.length > 5) {
+        renderSuggestions(suggestions);
+      } else {
+        suggestionChips.classList.add('hidden');
+      }
+
+      // Scroll to results
+      if (hasGSAP) {
+        gsap.to(window, { scrollTo: '#resultsArea', duration: 0.5, ease: 'power2.out' });
+      } else {
+        resultsArea.scrollIntoView({ behavior: 'smooth' });
+      }
     } catch (err) {
-      showError(`Search failed: ${err.message}. Check your connection and try again.`);
-      resultsArea.classList.remove('hidden');
-      resultsList.innerHTML = `
-        <div class="empty-state">
-          <h3>Search failed</h3>
-          <p>${escapeHtml(err.message)}</p>
-          <p style="font-size:12px;">The backend may be unreachable or OpenStreetMap APIs may be rate-limiting.</p>
-        </div>`;
-    } finally {
       showLoading(false);
+      showError('Search failed: ' + err.message + '. Check your connection and try again.');
+      resultsArea.classList.remove('hidden');
+      resultsList.innerHTML = '<div class="empty-state"><h3>Search failed</h3><p>' + escapeHtml(err.message) + '</p><p style="font-size:12px;">The backend may be unreachable or OpenStreetMap APIs may be rate-limiting.</p></div>';
     }
   }
 
-  async function refine() {
+  function renderSuggestions(suggestions) {
+    suggestionChips.innerHTML = '';
+    suggestionChips.classList.remove('hidden');
+    suggestions.forEach(s => {
+      const chip = document.createElement('button');
+      chip.className = 'suggestion-chip';
+      chip.textContent = s;
+      chip.addEventListener('click', () => {
+        nlpInput.value = s;
+        doSearch();
+      });
+      suggestionChips.appendChild(chip);
+    });
+    if (hasGSAP) {
+      gsap.from('.suggestion-chip', { scale: 0.8, opacity: 0, duration: 0.3, stagger: 0.05 });
+    }
+  }
+
+  // ════════════════════════════════════════════
+  // REFINEMENT
+  // ════════════════════════════════════════════
+  async function doRefine() {
     if (!lastResults.length) {
       showError('No previous results to refine. Run a search first.');
       return;
     }
-
     hideError();
     const text = refineInput.value.trim();
     if (!text) {
@@ -1464,32 +2028,30 @@
       return;
     }
 
-    showLoading(true);
+    showLoading(true, 'Refining your results...');
+
     try {
-      const resp = await fetch(`${API}/refine`, {
+      const resp = await fetch(API + '/refine', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          previous_results: lastResults,
-          refinement: text,
-        }),
+        body: JSON.stringify({ previous_results: lastResults, refinement: text }),
       });
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ detail: 'Unknown error' }));
-        throw new Error(err.detail || `HTTP ${resp.status}`);
+        throw new Error(err.detail || 'HTTP ' + resp.status);
       }
 
       const data = await resp.json();
+      showLoading(false);
       hideError();
       renderResults(data.results, null);
       setupCardClickHandlers();
       refineInput.value = '';
-      resultsCount.textContent = data.note || `${data.results.length} result${data.results.length !== 1 ? 's' : ''}`;
+      resultsCount.textContent = data.note || data.results.length + ' result' + (data.results.length !== 1 ? 's' : '');
     } catch (err) {
-      showError(`Refinement failed: ${err.message}`);
-    } finally {
       showLoading(false);
+      showError('Refinement failed: ' + err.message);
     }
   }
 
@@ -1499,17 +2061,54 @@
     resultsCount.textContent = '';
     coverageNote.classList.add('hidden');
     mapContainer.classList.add('hidden');
+    suggestionChips.classList.add('hidden');
     lastResults = [];
     lastQuery = null;
-    splash.classList.remove('hidden');
-    searchForm.style.display = '';
   }
 
-  // ── Event listeners ──
-  searchBtn.addEventListener('click', search);
-  location.addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
-  refineBtn.addEventListener('click', refine);
-  refineInput.addEventListener('keydown', e => { if (e.key === 'Enter') refine(); });
+  // ════════════════════════════════════════════
+  // EVENT LISTENERS
+  // ════════════════════════════════════════════
+
+  // Landing → Search
+  landingCta.addEventListener('click', () => {
+    showView('search', true);
+    // Start geolocation detection
+    setTimeout(() => initGeolocation(), 300);
+  });
+
+  // Logo → Landing
+  logoLink.addEventListener('click', () => {
+    showView('landing', true);
+  });
+
+  // Geo confirm
+  geoUseBtn.addEventListener('click', confirmGeoLocation);
+  geoChangeBtn.addEventListener('click', () => {
+    geoOverlay.classList.remove('visible');
+    showManualLocation();
+  });
+
+  // Manual location
+  manualLocationBtn.addEventListener('click', setManualLocation);
+  manualLocationInput.addEventListener('keydown', e => { if (e.key === 'Enter') setManualLocation(); });
+
+  // NLP Search
+  nlpSubmit.addEventListener('click', doSearch);
+  nlpInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+  // Advanced toggle
+  advancedToggle.addEventListener('click', () => {
+    advancedToggle.classList.toggle('open');
+    advancedPanel.classList.toggle('open');
+    if (advancedPanel.classList.contains('open') && hasGSAP) {
+      gsap.from('.advanced-inner', { height: 0, opacity: 0, duration: 0.3, ease: 'power2.out' });
+    }
+  });
+
+  // Refinement
+  refineBtn.addEventListener('click', doRefine);
+  refineInput.addEventListener('keydown', e => { if (e.key === 'Enter') doRefine(); });
   clearResultsBtn.addEventListener('click', clearResults);
 
   // Quick refinement pills
@@ -1520,24 +2119,24 @@
         return;
       }
       refineInput.value = pill.dataset.refine;
-      refine();
+      doRefine();
     });
   });
 
-  // Enter key in refinement input
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && document.activeElement === refineInput) {
-      refine();
-    }
-  });
+  // ════════════════════════════════════════════
+  // INIT
+  // ════════════════════════════════════════════
 
-  // ── Bootstrap ──
-  location.placeholder = 'e.g. Accra, Ghana or Shoreditch, London';
-  budget.placeholder = '100';
-  timeAvailable.placeholder = '3';
-  maxDistance.placeholder = '5';
+  // Animate landing page entrance
+  if (hasGSAP) {
+    gsap.from('.landing-logo', { y: 30, opacity: 0, duration: 0.6, delay: 0.1 });
+    gsap.from('.landing-tagline', { y: 25, opacity: 0, duration: 0.6, delay: 0.2 });
+    gsap.from('.landing-desc', { y: 20, opacity: 0, duration: 0.6, delay: 0.3 });
+    gsap.from('.landing-cta', { y: 20, opacity: 0, scale: 0.95, duration: 0.5, delay: 0.45 });
+    gsap.from('.landing-badges', { y: 15, opacity: 0, duration: 0.5, delay: 0.55 });
+  }
 
-  console.log('LocalLens ready. Try: "Accra, Ghana" with GH₵100, 3 hours, solo, interested in food & culture.');
+  console.log('LocalLens V1-A ready.');
 })();
 </script>
 </body>
