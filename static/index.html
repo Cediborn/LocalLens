@@ -136,6 +136,14 @@
     from { opacity: 0; transform: translateY(20px) scale(0.95); }
     to { opacity: 1; transform: translateY(0) scale(1); }
   }
+  @keyframes cardEnter {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes chipEnter {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
+  }
   .landing-cta::before {
     content: '';
     position: absolute;
@@ -1830,16 +1838,11 @@
 
     initMap(results);
 
-    // GSAP staggered entrance
-    if (hasGSAP) {
-      gsap.from('.result-card', {
-        y: 25,
-        opacity: 0,
-        duration: 0.4,
-        stagger: 0.06,
-        ease: 'power2.out'
-      });
-    }
+    // CSS staggered entrance (no GSAP dependency — avoids opacity bugs)
+    const cards = resultsList.querySelectorAll('.result-card');
+    cards.forEach((card, i) => {
+      card.style.animation = 'cardEnter 0.4s ease-out ' + (i * 0.05) + 's both';
+    });
   }
 
   // ════════════════════════════════════════════
@@ -2006,19 +2009,17 @@
   function renderSuggestions(suggestions) {
     suggestionChips.innerHTML = '';
     suggestionChips.classList.remove('hidden');
-    suggestions.forEach(s => {
+    suggestions.forEach((s, i) => {
       const chip = document.createElement('button');
       chip.className = 'suggestion-chip';
       chip.textContent = s;
+      chip.style.animation = 'chipEnter 0.3s ease-out ' + (i * 0.05) + 's both';
       chip.addEventListener('click', () => {
         nlpInput.value = s;
         doSearch();
       });
       suggestionChips.appendChild(chip);
     });
-    if (hasGSAP) {
-      gsap.from('.suggestion-chip', { scale: 0.8, opacity: 0, duration: 0.3, stagger: 0.05 });
-    }
   }
 
   // ════════════════════════════════════════════
