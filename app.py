@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 import httpx
 
 from scoring import (
@@ -40,6 +41,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve static files (JS, CSS, images) from /static/
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
