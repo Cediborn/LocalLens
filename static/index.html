@@ -78,13 +78,16 @@
     height: 100%;
     pointer-events: none;
     z-index: 0;
-    opacity: 0.7;
+    opacity: 0.65;
   }
 
   .landing-content {
     position: relative;
     z-index: 1;
     max-width: 640px;
+    padding: 48px 40px;
+    border-radius: 20px;
+    background: radial-gradient(ellipse at 50% 40%, rgba(15,17,23,0.55) 0%, rgba(15,17,23,0.3) 60%, transparent 100%);
   }
 
   .landing-logo {
@@ -103,19 +106,21 @@
   .landing-tagline {
     font-size: 22px;
     font-weight: 600;
-    color: var(--text);
+    color: #fff;
     margin-bottom: 12px;
     letter-spacing: -0.3px;
     animation: fadeInUp 0.6s ease-out 0.2s both;
+    text-shadow: 0 1px 4px rgba(15,17,23,0.5);
   }
 
   .landing-desc {
     font-size: 16px;
-    color: var(--text-muted);
+    color: #DDE3F0;
     max-width: 480px;
     margin: 0 auto 40px;
     line-height: 1.65;
     animation: fadeInUp 0.6s ease-out 0.3s both;
+    text-shadow: 0 1px 3px rgba(15,17,23,0.6);
   }
 
   .landing-cta {
@@ -187,14 +192,15 @@
   }
   .landing-badge {
     font-size: 12px;
-    color: var(--text-muted);
-    background: var(--surface);
+    color: #b0b6cc;
+    background: rgba(26,29,39,0.75);
     border: 1px solid var(--border);
     border-radius: 20px;
     padding: 6px 14px;
     display: flex;
     align-items: center;
     gap: 6px;
+    backdrop-filter: blur(4px);
   }
   .landing-badge .dot {
     width: 6px; height: 6px;
