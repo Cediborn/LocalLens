@@ -9,6 +9,7 @@ JSON API at /api/*.
 """
 
 import os
+import re
 import time
 import hashlib
 import json
@@ -26,13 +27,16 @@ from scoring import (
     score_place,
     extract_place_data,
     haversine_m,
+    VALID_INTERESTS,
+    FOOD_CATEGORIES,
 )
+from opening_hours import get_open_status
 
 
 app = FastAPI(
     title="LocalLens API",
     description="Real local discovery powered by OpenStreetMap. Find things to do near you.",
-    version="1.0.0",
+    version="1.1.0",
 )
 
 app.add_middleware(
@@ -47,18 +51,30 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-USER_AGENT = "LocalLens/1.0 (local discovery app)"
+USER_AGENT = "LocalLens/1.1 (local-discovery; https://locallens.app)"
 NOMINATIM_URL = "https://nominatim.openstreetmap.org"
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 OVERPASS_KUMI = "https://overpass.kumi.systems/api/interpreter"
 
-_cache: dict = {}
-_CACHE_MAX_AGE = 3600
-_CACHE_MAX_SIZE = 200
+_geocode_cache: dict = {}
+_search_cache: dict = {}
+_GEOCODE_CACHE_MAX_AGE = 86400  # 24h for geocode results
+_SEARCH_CACHE_MAX_AGE = 1800    # 30 min for search results
+_CACHE_MAX_SIZE = 300
 
 _rate_limit: dict = {}
 _RATE_LIMIT_WINDOW = 1.0
-_RATE_LIMIT_MAX = 1
+_RATE_LIMIT_MAX = 2
+
+# Max Overpass timeout
+OVERPASS_TIMEOUT_S = 15.0
+OVERPASS_TOTAL_TIMEOUT_S = 20.0
+
+# Maximum results to return
+MAX_RESULTS = 30
+
+# Minimum score threshold (hide very weak matches)
+MIN_SCORE_THRESHOLD = 3.0
 
 
 # ── Cache ──────────────────────────────────────────────────────────────────────
@@ -69,21 +85,21 @@ def _cache_key(prefix: str, args: dict) -> str:
     return f"{prefix}:{h}"
 
 
-def _cache_get(key: str):
-    entry = _cache.get(key)
+def _cache_get(cache: dict, key: str, max_age: float):
+    entry = cache.get(key)
     if entry is None:
         return None
-    if time.time() - entry["timestamp"] > _CACHE_MAX_AGE:
-        del _cache[key]
+    if time.time() - entry["timestamp"] > max_age:
+        del cache[key]
         return None
     return entry["data"]
 
 
-def _cache_set(key: str, data: dict):
-    if len(_cache) >= _CACHE_MAX_SIZE:
-        oldest = min(_cache.items(), key=lambda x: x[1]["timestamp"])
-        del _cache[oldest[0]]
-    _cache[key] = {"data": data, "timestamp": time.time()}
+def _cache_set(cache: dict, key: str, data):
+    if len(cache) >= _CACHE_MAX_SIZE:
+        oldest = min(cache.items(), key=lambda x: x[1]["timestamp"])
+        del cache[oldest[0]]
+    cache[key] = {"data": data, "timestamp": time.time()}
 
 
 # ── Rate limit ─────────────────────────────────────────────────────────────────
@@ -105,18 +121,18 @@ def _check_rate_limit(client_ip: str) -> bool:
 
 # ── HTTP helpers ───────────────────────────────────────────────────────────────
 
-async def _http_get(url: str, params: dict = None, headers: dict = None, timeout: float = 30.0):
+async def _http_get(url: str, params: dict = None, headers: dict = None, timeout: float = 15.0):
     headers = headers or {}
     headers.setdefault("User-Agent", USER_AGENT)
 
     async with httpx.AsyncClient(timeout=timeout) as client:
-        for attempt in range(3):
+        for attempt in range(2):
             try:
                 resp = await client.get(url, params=params, headers=headers)
                 if resp.status_code == 200:
                     return resp.json()
                 elif resp.status_code == 429:
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(1.5 ** attempt)
                     continue
                 else:
                     raise httpx.HTTPStatusError(
@@ -124,25 +140,29 @@ async def _http_get(url: str, params: dict = None, headers: dict = None, timeout
                         request=resp.request,
                         response=resp,
                     )
-            except Exception:
-                if attempt == 2:
+            except httpx.TimeoutException:
+                if attempt == 1:
                     raise
-                await asyncio.sleep(1)
-    raise httpx.HTTPStatusError("Max retries exceeded", request=None, response=None)
+                continue
+            except Exception:
+                if attempt == 1:
+                    raise
+                await asyncio.sleep(0.5)
+    raise httpx.HTTPStatusError("Request failed", request=None, response=None)
 
 
-async def _http_post(url: str, data: dict, headers: dict = None, timeout: float = 60.0):
+async def _http_post(url: str, data: dict, headers: dict = None, timeout: float = 20.0):
     headers = headers or {}
     headers.setdefault("User-Agent", USER_AGENT)
 
     async with httpx.AsyncClient(timeout=timeout) as client:
-        for attempt in range(3):
+        for attempt in range(2):
             try:
                 resp = await client.post(url, data=data, headers=headers)
                 if resp.status_code == 200:
                     return resp.json()
                 elif resp.status_code == 429:
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(1.5 ** attempt)
                     continue
                 else:
                     raise httpx.HTTPStatusError(
@@ -150,24 +170,54 @@ async def _http_post(url: str, data: dict, headers: dict = None, timeout: float 
                         request=resp.request,
                         response=resp,
                     )
-            except Exception:
-                if attempt == 2:
+            except httpx.TimeoutException:
+                if attempt == 1:
                     raise
-                await asyncio.sleep(1)
-    raise httpx.HTTPStatusError("Max retries exceeded", request=None, response=None)
+                continue
+            except Exception:
+                if attempt == 1:
+                    raise
+                await asyncio.sleep(0.5)
+    raise httpx.HTTPStatusError("Request failed", request=None, response=None)
+
+
+# ── URL Safety ─────────────────────────────────────────────────────────────────
+
+SAFE_PROTOCOLS = ("https:", "http:")
+
+def sanitize_url(url: str) -> Optional[str]:
+    """Sanitize a URL to prevent XSS. Only allows http/https protocols."""
+    if not url:
+        return None
+    url = url.strip()
+    # Check for dangerous protocols
+    lower = url.lower()
+    for proto in ["javascript:", "data:", "vbscript:", "file:", "ftp:"]:
+        if lower.startswith(proto):
+            return None
+    # Ensure it starts with http or https
+    if not (lower.startswith("https:") or lower.startswith("http:")):
+        # Might be a relative URL or missing protocol
+        if lower.startswith("//"):
+            url = "https:" + url
+        elif "." in lower and " " not in url:
+            url = "https://" + url
+        else:
+            return None
+    return url
 
 
 # ── Geocoding ──────────────────────────────────────────────────────────────────
 
 async def geocode(query: str) -> dict:
     cache_key = _cache_key("geo", {"q": query})
-    cached = _cache_get(cache_key)
+    cached = _cache_get(_geocode_cache, cache_key, _GEOCODE_CACHE_MAX_AGE)
     if cached:
         return cached
 
     params = {"q": query, "format": "json", "limit": 1, "addressdetails": 1}
     try:
-        data = await _http_get(f"{NOMINATIM_URL}/search", params=params, timeout=15.0)
+        data = await _http_get(f"{NOMINATIM_URL}/search", params=params, timeout=10.0)
         if data and len(data) > 0:
             result = {
                 "lat": float(data[0]["lat"]),
@@ -177,11 +227,55 @@ async def geocode(query: str) -> dict:
                 "source": "Nominatim (OpenStreetMap)",
                 "query": query,
             }
-            _cache_set(cache_key, result)
+            _cache_set(_geocode_cache, cache_key, result)
             return result
         raise ValueError(f"No results for '{query}'")
+    except ValueError:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Geocoding failed: {str(e)}")
+
+
+async def reverse_geocode(lat: float, lon: float) -> str:
+    """Reverse geocode coordinates to a human-readable place name."""
+    cache_key = _cache_key("revgeo", {"lat": round(lat, 4), "lon": round(lon, 4)})
+    cached = _cache_get(_geocode_cache, cache_key, _GEOCODE_CACHE_MAX_AGE)
+    if cached:
+        return cached.get("display_name", f"{lat:.4f}, {lon:.4f}")
+
+    params = {"lat": lat, "lon": lon, "format": "json", "zoom": 16, "addressdetails": 1}
+    try:
+        data = await _http_get(f"{NOMINATIM_URL}/reverse", params=params, timeout=10.0)
+        if data and data.get("display_name"):
+            display = data["display_name"]
+            # Build a shorter display name from address components
+            addr = data.get("address", {})
+            parts = []
+            for key in ["neighbourhood", "suburb", "city_district", "town", "city",
+                         "village", "municipality", "state", "country"]:
+                if key in addr and addr[key] not in parts:
+                    parts.append(addr[key])
+                    if len(parts) >= 3:
+                        break
+            if not parts:
+                for key in ["road", "borough", "county"]:
+                    if key in addr:
+                        parts.append(addr[key])
+                        break
+                parts.append(addr.get("city", ""))
+                parts.append(addr.get("country", ""))
+            short_name = ", ".join(p for p in parts if p)
+            if len(short_name) > 60:
+                short_name = ", ".join(display.split(",")[0:3])
+            if not short_name:
+                short_name = ", ".join(display.split(",")[0:2])
+            result = {"display_name": short_name}
+            _cache_set(_geocode_cache, cache_key, result)
+            return result["display_name"]
+    except Exception:
+        pass
+
+    return f"{lat:.4f}, {lon:.4f}"
 
 
 # ── POI search ─────────────────────────────────────────────────────────────────
@@ -253,11 +347,21 @@ async def search_pois(lat: float, lon: float, radius_m: float,
 out center;
 """
 
+    # Check search cache
+    cache_args = {"lat": round(lat, 4), "lon": round(lon, 4),
+                  "radius": int(radius_m), "cats": sorted(categories)}
+    cache_key = _cache_key("search", cache_args)
+    cached = _cache_get(_search_cache, cache_key, _SEARCH_CACHE_MAX_AGE)
+    if cached:
+        return cached
+
     try:
-        data = await _http_post(OVERPASS_URL, {"data": overpass_query}, timeout=50.0)
+        data = await _http_post(OVERPASS_URL, {"data": overpass_query},
+                                timeout=OVERPASS_TOTAL_TIMEOUT_S)
     except Exception:
         try:
-            data = await _http_post(OVERPASS_KUMI, {"data": overpass_query}, timeout=50.0)
+            data = await _http_post(OVERPASS_KUMI, {"data": overpass_query},
+                                    timeout=OVERPASS_TOTAL_TIMEOUT_S)
         except Exception as e:
             raise HTTPException(status_code=502, detail=f"Overpass API unavailable: {str(e)}")
 
@@ -281,7 +385,9 @@ out center;
             seen.add(key)
             deduped.append(p)
 
-    return deduped[:limit]
+    result = deduped[:limit]
+    _cache_set(_search_cache, cache_key, result)
+    return result
 
 
 # ── Frontend ───────────────────────────────────────────────────────────────────
@@ -307,9 +413,24 @@ async def health():
     return {
         "status": "ok",
         "service": "LocalLens",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+# ── Reverse geocode (dedicated endpoint) ───────────────────────────────────────
+
+@app.post("/api/reverse-geocode")
+async def api_reverse_geocode(body: dict):
+    lat = body.get("lat")
+    lon = body.get("lon")
+    if lat is None or lon is None:
+        raise HTTPException(status_code=400, detail="lat and lon are required")
+    try:
+        name = await reverse_geocode(float(lat), float(lon))
+    except Exception:
+        name = f"{float(lat):.4f}, {float(lon):.4f}"
+    return {"display_name": name, "lat": float(lat), "lon": float(lon)}
 
 
 # ── Recommend ──────────────────────────────────────────────────────────────────
@@ -328,7 +449,31 @@ async def recommend(body: dict):
     max_distance_km = float(body.get("max_distance_km", 5.0))
     start_time = body.get("start_time")
 
+    # Validate interests
+    valid_interests = []
+    for interest in interests:
+        if isinstance(interest, str) and interest.lower().strip() in VALID_INTERESTS:
+            valid_interests.append(interest.lower().strip())
+    interests = valid_interests
+
+    # Validate and clamp distance
+    max_distance_km = max(0.5, min(max_distance_km, 50.0))
     max_distance_m = max_distance_km * 1000
+
+    # Parse start_time if provided
+    check_time = None
+    if start_time:
+        try:
+            # start_time could be "HH:MM" or ISO datetime
+            now = datetime.now(timezone.utc)
+            if re.match(r'^\d{1,2}:\d{2}$', str(start_time)):
+                parts = str(start_time).split(":")
+                h, m = int(parts[0]), int(parts[1])
+                check_time = now.replace(hour=h, minute=m, second=0, microsecond=0)
+            else:
+                check_time = datetime.fromisoformat(str(start_time))
+        except (ValueError, TypeError):
+            check_time = None
 
     # Geocode
     geo_result = await geocode(location)
@@ -356,7 +501,7 @@ async def recommend(body: dict):
         "group": ["restaurant", "sports_centre", "food_court", "event_venue"],
     }
     for interest in interests:
-        cats = interest_cat_map.get(interest.lower().strip(), [])
+        cats = interest_cat_map.get(interest, [])
         interest_categories.update(cats)
 
     # Default broad search if no interests
@@ -391,6 +536,7 @@ async def recommend(body: dict):
                 "interests": interests,
                 "alone": alone,
                 "max_distance_km": max_distance_km,
+                "start_time": start_time,
             },
             "results": [],
             "data_sources": ["nominatim_osm"],
@@ -416,14 +562,68 @@ async def recommend(body: dict):
             currency=budget_currency,
             alone=alone,
             interests=interests,
+            check_time=check_time,
         )
         scored.append(result)
 
+    # Apply time-awareness when a specific start time is requested
+    if check_time is not None:
+        # Categorize every result without changing scores (keeps breakdown bars consistent)
+        open_places = []
+        unknown_hours = []
+        closed_places = []
+        for r in scored:
+            if r.open_status and r.open_status.has_hours_data:
+                if r.open_status.is_open:
+                    open_places.append(r)
+                else:
+                    closed_places.append(r)
+            else:
+                unknown_hours.append(r)
+
+        # If we have enough open/unknown options, exclude clearly-closed places.
+        # Unknown-hours places are down-ranked (kept below open ones) since
+        # we can't confirm they'll be open.
+        if len(open_places) + len(unknown_hours) >= 5:
+            scored = open_places + unknown_hours
+        else:
+            # Too few options — include closed ones at the very bottom
+            scored = open_places + unknown_hours + closed_places
+
     scored.sort(key=lambda r: r.score, reverse=True)
 
+    # When a specific start time was requested, keep time-awareness as the
+    # primary ordering: open-now first, unknown-hours next, closed last.
+    # This down-ranks unknown-hours results instead of pretending they're open.
+    if check_time is not None:
+        def _time_tier(r):
+            if r.open_status and r.open_status.has_hours_data:
+                return 2 if r.open_status.is_open else 0
+            return 1
+        scored.sort(key=lambda r: (_time_tier(r), r.score), reverse=True)
+
+    # Filter out unnamed places unless there are very few named results
+    filtered = []
+    unnamed = []
+    for r in scored:
+        name = r.place.get("name", "")
+        if name.startswith("Unnamed "):
+            unnamed.append(r)
+        elif r.score >= MIN_SCORE_THRESHOLD:
+            filtered.append(r)
+    if not filtered:
+        # Only unnamed results exist — keep the best ones but cap their score
+        filtered = [r for r in unnamed[:10]]
+        for r in filtered:
+            r.score = min(r.score, 6.0)
+
     results = []
-    for r in scored[:30]:
+    for r in filtered[:MAX_RESULTS]:
         place = r.place
+        tags = place.get("tags", {})
+        website = sanitize_url(tags.get("website", ""))
+        phone = tags.get("phone") or tags.get("contact:phone")
+
         results.append({
             "name": place["name"],
             "category": place["category"],
@@ -432,22 +632,28 @@ async def recommend(body: dict):
             "distance_km": r.distance_km,
             "estimated_time_hours": r.est_time,
             "cost_estimate": r.cost_estimate,
-            "opening_hours": place["tags"].get("opening_hours", "Unknown"),
-            "address": place["tags"].get("addr:full")
-                       or place["tags"].get("addr:street")
-                       or place["tags"].get("address")
-                       or "Location only",
-            "phone": place["tags"].get("phone"),
-            "website": place["tags"].get("website"),
-            "osm_tags": {k: v for k, v in place["tags"].items()
+            "opening_hours": tags.get("opening_hours", "Unknown"),
+            "open_status": {
+                "is_open": r.open_status.is_open if r.open_status else None,
+                "status_text": r.open_status.status_text if r.open_status else "Unknown",
+                "next_open": r.open_status.next_open_text if r.open_status else "",
+            } if r.open_status else None,
+            "address": tags.get("addr:full")
+                       or tags.get("addr:street")
+                       or tags.get("address")
+                       or None,
+            "phone": phone,
+            "website": website,
+            "osm_tags": {k: v for k, v in tags.items()
                          if k not in ("name", "addr:full", "addr:street", "address",
-                                       "phone", "website")},
+                                       "phone", "website", "contact:phone",
+                                       "opening_hours")},
             "why_it_matches": r.why,
             "score": r.score,
             "breakdown": r.breakdown,
             "confidence": r.confidence,
             "confidence_details": r.confidence_details,
-            "source": r.place.get("source", "OpenStreetMap via Overpass API"),
+            "source": place.get("source", "OpenStreetMap via Overpass API"),
             "osm_id": place.get("id"),
             "osm_type": place.get("osm_type"),
         })
@@ -478,15 +684,10 @@ async def recommend(body: dict):
         "scoring_model": {
             "factors": {
                 "distance": "20% — closer is better",
-                "budget": "25% — fits your budget",
+                "budget": "25% — fits your budget (neutral when no budget set)",
                 "time": "20% — fits your available time",
                 "interests": "25% — matches your interests",
                 "companion": "10% — solo/group suitability",
-            },
-            "confidence_tiers": {
-                "verified": "Data directly from OpenStreetMap",
-                "estimated": "Derived from available data or typical values",
-                "unknown": "Insufficient data for reliable scoring",
             },
         },
     }
@@ -497,11 +698,13 @@ async def recommend(body: dict):
 @app.post("/api/refine")
 async def refine(body: dict):
     prev_results = body.get("previous_results", [])
-    refinement = (body.get("refinement") or "").strip().lower()
+    refinement = (body.get("refinement") or "").strip()
     new_constraints = body.get("new_constraints", {})
 
     if not prev_results:
         raise HTTPException(status_code=400, detail="No previous results to refine")
+
+    refinement_lower = refinement.lower()
 
     # If new constraints provided, re-score properly with the scoring engine
     if new_constraints:
@@ -530,6 +733,9 @@ async def refine(body: dict):
                 "osm_type": pr.get("osm_type"),
                 "source": pr.get("source"),
             }
+            # Reconstruct opening_hours from the result
+            if pr.get("opening_hours") and pr["opening_hours"] != "Unknown":
+                place["tags"]["opening_hours"] = pr["opening_hours"]
             if place.get("lat") is None or place.get("lon") is None:
                 q = (prev_results[0].get("query") or {})
                 place["lat"] = q.get("lat")
@@ -559,30 +765,7 @@ async def refine(body: dict):
 
         scored.sort(key=lambda r: r.score, reverse=True)
 
-        refined_results = []
-        for r in scored[:30]:
-            refined_results.append({
-                "name": r.place["name"],
-                "category": r.place["category"],
-                "lat": r.place.get("lat"),
-                "lon": r.place.get("lon"),
-                "distance_km": r.distance_km,
-                "estimated_time_hours": r.est_time,
-                "cost_estimate": r.cost_estimate,
-                "opening_hours": r.place["tags"].get("opening_hours", "Unknown"),
-                "address": r.place["tags"].get("addr:full")
-                           or r.place["tags"].get("addr:street")
-                           or r.place["tags"].get("address")
-                           or "Location only",
-                "phone": r.place["tags"].get("phone"),
-                "website": r.place["tags"].get("website"),
-                "why_it_matches": r.why,
-                "score": r.score,
-                "breakdown": r.breakdown,
-                "confidence": r.confidence,
-                "confidence_details": r.confidence_details,
-                "source": r.place.get("source"),
-            })
+        refined_results = _format_scored_results(scored, prev_results)
 
         return {
             "refinement_applied": refinement,
@@ -591,164 +774,198 @@ async def refine(body: dict):
             "note": "Results re-scored based on updated constraints.",
         }
 
-    # Conversational refinement — interpret and adjust scores heuristically
+    # ── Conversational refinement ──
+
+    # Detect "top N" requests
+    top_match = re.search(r'\btop\s+(\d+)\b', refinement_lower)
+    if top_match:
+        n = min(int(top_match.group(1)), MAX_RESULTS)
+        # Sort by score descending and take top N
+        sorted_results = sorted(prev_results, key=lambda r: r.get("score", 0), reverse=True)
+        top_results = sorted_results[:n]
+        return {
+            "refinement_applied": refinement,
+            "results": top_results,
+            "note": f"Showing top {n} results by score.",
+        }
+
+    # Detect exclusion patterns: "no food", "nothing involving food", etc.
+    exclude_food = any(w in refinement_lower for w in [
+        "no food", "not food", "nothing involving food",
+        "no restaurants", "no eating", "avoid food", "without food",
+        "exclude food", "remove food", "no cafe", "no bar", "no pub",
+        "no fast food", "no food places",
+    ])
+    exclude_nightlife = any(w in refinement_lower for w in [
+        "no nightlife", "no bars", "no clubs", "no drinking",
+        "no alcohol", "without nightlife",
+    ])
+    exclude_shopping = any(w in refinement_lower for w in [
+        "no shopping", "no shops", "no stores", "without shopping",
+    ])
+
+    # Detect "make it cheaper" / "more affordable"
+    want_cheaper = any(w in refinement_lower for w in [
+        "cheaper", "budget", "save money", "less expensive",
+        "low cost", "affordable", "free", "inexpensive",
+        "more affordable", "lower cost", "not expensive",
+    ])
+    want_expensive = any(w in refinement_lower for w in [
+        "expensive", "fancy", "upscale", "splurge",
+        "premium", "luxury", "good quality", "high end", "fine dining",
+    ])
+    want_evening = any(w in refinement_lower for w in [
+        "after 8", "after 8pm", "after 20", "evening", "night",
+        "late", "open late", "tonight", "after dark",
+    ])
+    want_culture = any(w in refinement_lower for w in [
+        "culture", "cultural", "art", "museum", "history", "theatre",
+        "cinema", "gallery", "exhibit", "show", "performance", "play", "film",
+    ])
+    want_outdoors = any(w in refinement_lower for w in [
+        "nature", "outdoors", "outdoor", "park", "walk", "hike", "outside",
+        "green", "garden", "trail", "fresh air",
+    ])
+    want_closer = any(w in refinement_lower for w in [
+        "closer", "near", "nearby", "close by",
+        "walking distance", "walking", "short walk",
+    ])
+    want_farther = any(w in refinement_lower for w in [
+        "farther", "further", "wider", "more distance",
+        "travel", "drive", "longer trip",
+    ])
+    want_quick = any(w in refinement_lower for w in [
+        "quick", "fast", "short time", "brief", "under an hour",
+        "quick visit", "short",
+    ])
+
+    # Check if any recognized refinement was detected
+    recognized = (exclude_food or exclude_nightlife or exclude_shopping or
+                  want_cheaper or want_expensive or want_evening or
+                  want_culture or want_outdoors or want_closer or
+                  want_farther or want_quick or top_match is not None)
+
+    if not recognized:
+        return {
+            "refinement_applied": refinement,
+            "results": prev_results[:MAX_RESULTS],
+            "note": f"Refinement \"{refinement}\" was not understood. "
+                    f"Try: \"Top 3\", \"Nothing involving food\", \"Make it cheaper\", "
+                    f"\"After 8pm\", \"More cultural\", \"Outdoors\", \"Closer\".",
+            "unrecognized": True,
+        }
+
+    # Apply refinement filters and score adjustments
     adjusted = []
     for pr in prev_results:
-        orig_score = pr.get("score", 5.0)
-        new_score = orig_score
+        score = pr.get("score", 5.0)
+        category = (pr.get("category") or "").lower()
+        cat_tag = (pr.get("osm_tags", {}).get("amenity", "") or
+                   pr.get("osm_tags", {}).get("leisure", "") or
+                   pr.get("osm_tags", {}).get("shop", "") or
+                   pr.get("osm_tags", {}).get("tourism", "") or "").lower()
+        combined_cat = f"{category} {cat_tag}"
+
+        skip = False
         adjustments = []
 
-        cost = pr.get("cost_estimate", {}).get("amount", 999)
-        budget_orig = (pr.get("query") or {}).get("budget", 0)
+        # ── Exclusion filters ──
+        if exclude_food and any(fc in combined_cat for fc in FOOD_CATEGORIES):
+            skip = True
+        if exclude_nightlife and any(nc in combined_cat for nc in ["nightclub", "bar", "pub", "dance_floor", "stripclub"]):
+            skip = True
+        if exclude_shopping and any(sc in combined_cat for sc in ["shop", "supermarket", "marketplace"]):
+            skip = True
 
-        # --- "cheaper" / "budget" / "save money" ---
-        if any(w in refinement for w in ["cheaper", "budget", "save money", "less expensive",
-                                           "low cost", "affordable", "free", "inexpensive"]):
-            if budget_orig > 0 and cost > 0:
-                ratio = cost / budget_orig
-                if ratio < 0.3:
-                    new_score += 2.0
-                    adjustments.append("boosted for being budget-friendly")
-                elif ratio < 0.6:
-                    new_score += 1.0
-                    adjustments.append("boosted for fitting budget")
+        if skip:
+            continue
 
-        # --- "expensive" / "fancy" / "upscale" ---
-        if any(w in refinement for w in ["expensive", "fancy", "upscale", "splurge",
-                                           "premium", "luxury", "good quality"]):
-            if budget_orig > 0 and cost > 0:
-                ratio = cost / budget_orig
-                if ratio > 0.8:
-                    new_score += 1.5
-                    adjustments.append("boosted for being higher-end")
+        # ── Cheaper boost ──
+        if want_cheaper:
+            cost = pr.get("cost_estimate", {}).get("amount", 0)
+            tier = pr.get("cost_estimate", {}).get("tier", "varies")
+            if tier == "free":
+                score += 2.0
+                adjustments.append("boosted — free")
+            elif tier == "budget":
+                score += 1.5
+                adjustments.append("boosted — budget-friendly")
+            elif tier == "moderate":
+                score += 0.5
+                adjustments.append("slightly boosted")
+            elif tier == "expensive":
+                score -= 1.5
+                adjustments.append("reduced — higher cost")
 
-        # --- "food" / "eat" / "dinner" / "drink" ---
-        if any(w in refinement for w in ["food", "eat", "dinner", "lunch", "brunch", "meal",
-                                           "drink", "drinks", "bar", "pub", "alcohol"]):
-            cat = pr.get("category", "").lower()
-            if any(c in cat for c in ["restaurant", "cafe", "bar", "pub", "fast_food", "food_court"]):
-                new_score += 2.0
-                adjustments.append("boosted for food/drink relevance")
+        # ── Expensive boost ──
+        if want_expensive:
+            tier = pr.get("cost_estimate", {}).get("tier", "varies")
+            if tier == "expensive":
+                score += 2.0
+                adjustments.append("boosted — higher-end")
+            elif tier == "moderate":
+                score += 0.5
+            elif tier in ("free", "budget"):
+                score -= 1.0
+
+        # ── Evening filter boost ──
+        if want_evening:
+            oh = (pr.get("opening_hours") or "").lower()
+            open_status = pr.get("open_status", {})
+            if open_status and open_status.get("is_open"):
+                score += 1.0
+                adjustments.append("open now")
+            elif any(t in oh for t in ["22:", "23:", "0:", "1:", "2:", "20:", "21:"]):
+                score += 1.5
+                adjustments.append("open late")
+            if any(nc in combined_cat for nc in ["nightclub", "bar", "pub"]):
+                score += 1.0
+                adjustments.append("likely open late")
+
+        # ── Culture boost ──
+        if want_culture:
+            if any(cc in combined_cat for cc in ["museum", "theatre", "cinema", "arts_centre", "gallery", "tourism", "attraction", "library"]):
+                score += 2.0
+                adjustments.append("boosted — cultural venue")
             else:
-                new_score -= 1.0
-                adjustments.append("slight penalty for not being food-related")
+                score -= 1.0
 
-        # --- "no food" / "not food" ---
-        if any(w in refinement for w in ["no food", "not food", "nothing involving food",
-                                           "no restaurants", "no eating", "avoid food"]):
-            cat = pr.get("category", "").lower()
-            if any(c in cat for c in ["restaurant", "cafe", "bar", "pub", "fast_food",
-                                       "food_court", "biergarten", "ice_cream"]):
-                new_score -= 5.0
-                adjustments.append("removed — this is a food venue")
+        # ── Outdoors boost ──
+        if want_outdoors:
+            if any(oc in combined_cat for oc in ["park", "leisure", "garden", "nature_reserve", "playground", "beach", "viewpoint", "recreation_ground"]):
+                score += 2.0
+                adjustments.append("boosted — outdoor venue")
             else:
-                new_score += 0.5
-                adjustments.append("slight boost for non-food")
+                score -= 1.0
 
-        # --- "after 8pm" / "evening" / "night" ---
-        if any(w in refinement for w in ["after 8", "after 8pm", "after 20", "evening", "night",
-                                           "late", "open late"]):
-            hours = pr.get("opening_hours", "").lower()
-            if hours and "unknown" not in hours:
-                if any(h in hours for h in ["22:", "23:", "0:", "1:", "2:", "20:", "21:"]):
-                    new_score += 2.0
-                    adjustments.append("boosted for evening/late hours")
-            cat = pr.get("category", "").lower()
-            if any(c in cat for c in ["nightclub", "bar", "pub"]):
-                new_score += 1.5
-                adjustments.append("likely open late based on category")
-
-        # --- "morning" / "early" / "before noon" ---
-        if any(w in refinement for w in ["morning", "early", "before noon", "before 12",
-                                           "breakfast", "daytime", "afternoon"]):
-            cat = pr.get("category", "").lower()
-            if any(c in cat for c in ["cafe", "restaurant", "museum", "park", "library", "gallery"]):
-                new_score += 1.0
-                adjustments.append("fits daytime activity")
-
-        # --- "further" / "travel farther" ---
-        if any(w in refinement for w in ["farther", "further", "wider", "more distance",
-                                           "travel", "drive", "longer trip"]):
-            dist = pr.get("distance_km", 0)
-            if dist > 1.0:
-                new_score += 0.5 * min(dist / 5, 1.0)
-                adjustments.append("slightly boosted for being farther away")
-
-        # --- "closer" / "near" / "nearby" ---
-        if any(w in refinement for w in ["closer", "near", "nearby", "close by",
-                                           "walking distance", "walking", "short walk"]):
+        # ── Closer boost ──
+        if want_closer:
             dist = pr.get("distance_km", 0)
             if dist < 1.0:
-                new_score += 1.5
-                adjustments.append("boosted for proximity")
+                score += 1.5
+                adjustments.append("boosted — very close")
             elif dist < 3.0:
-                new_score += 0.5
-                adjustments.append("slightly boosted for being close")
+                score += 0.5
+                adjustments.append("boosted — close by")
 
-        # --- "culture" / "art" / "museum" ---
-        if any(w in refinement for w in ["culture", "art", "museum", "history", "theatre",
-                                           "cinema", "gallery", "exhibit", "show", "performance",
-                                           "play", "film"]):
-            cat = pr.get("category", "").lower()
-            if any(c in cat for c in ["museum", "theatre", "cinema", "arts_centre", "gallery",
-                                       "tourism", "attraction", "library"]):
-                new_score += 2.0
-                adjustments.append("boosted for culture/arts relevance")
+        # ── Farther boost ──
+        if want_farther:
+            dist = pr.get("distance_km", 0)
+            if dist > 1.0:
+                score += 0.5 * min(dist / 5, 1.0)
+                adjustments.append("boosted for being farther away")
 
-        # --- "nature" / "outdoors" / "park" ---
-        if any(w in refinement for w in ["nature", "outdoors", "park", "walk", "hike", "outside",
-                                           "green", "garden", "trail", "fresh air"]):
-            cat = pr.get("category", "").lower()
-            if any(c in cat for c in ["park", "leisure", "garden", "nature_reserve", "playground",
-                                       "beach", "viewpoint", "recreation_ground"]):
-                new_score += 2.0
-                adjustments.append("boosted for outdoors/nature relevance")
+        # ── Quick boost ──
+        if want_quick:
+            est = pr.get("estimated_time_hours", 999)
+            if est <= 0.5:
+                score += 2.0
+                adjustments.append("boosted — quick visit")
+            elif est <= 1.0:
+                score += 1.0
+                adjustments.append("boosted — short duration")
 
-        # --- "shopping" / "shop" / "market" ---
-        if any(w in refinement for w in ["shopping", "shop", "buy", "market", "mall", "browse",
-                                           "store"]):
-            cat = pr.get("category", "").lower()
-            if any(c in cat for c in ["shop", "supermarket", "marketplace", "shopping_centre"]):
-                new_score += 2.0
-                adjustments.append("boosted for shopping relevance")
-
-        # --- "alone" / "solo" ---
-        if any(w in refinement for w in ["alone", "solo", "by myself", "on my own", "by my self"]):
-            cat = pr.get("category", "").lower()
-            if any(c in cat for c in ["cafe", "library", "museum", "park", "cinema", "theatre",
-                                       "gallery", "bookshop", "church"]):
-                new_score += 1.5
-                adjustments.append("boosted for solo-friendly venue")
-
-        # --- "with friends" / "group" / "family" ---
-        if any(w in refinement for w in ["with friends", "with others", "with people", "group",
-                                           "friends", "family", "together", "social", "company"]):
-            cat = pr.get("category", "").lower()
-            if any(c in cat for c in ["restaurant", "bar", "pub", "sports_centre", "food_court",
-                                       "event_venue", "amusement_ride"]):
-                new_score += 1.5
-                adjustments.append("boosted for group-friendly venue")
-
-        # --- "quick" / "fast" / "short" ---
-        if any(w in refinement for w in ["quick", "fast", "short time", "brief", "under an hour",
-                                           "quick visit", "short"]):
-            est_time = pr.get("estimated_time_hours", 999)
-            if est_time <= 1.0:
-                new_score += 1.5
-                adjustments.append("boosted for being a quick activity")
-            elif est_time <= 2.0:
-                new_score += 0.5
-                adjustments.append("slightly boosted for moderate duration")
-
-        # --- "long" / "spend time" ---
-        if any(w in refinement for w in ["long", "hours", "spend time", "kill time", "all morning",
-                                           "all afternoon", "all day"]):
-            est_time = pr.get("estimated_time_hours", 0)
-            if est_time >= 2.0:
-                new_score += 1.0
-                adjustments.append("boosted for longer activity")
-
-        new_score = max(0.0, min(10.0, new_score))
+        score = max(0.0, min(10.0, score))
 
         adjusted.append({
             "name": pr.get("name"),
@@ -759,69 +976,109 @@ async def refine(body: dict):
             "estimated_time_hours": pr.get("estimated_time_hours"),
             "cost_estimate": pr.get("cost_estimate"),
             "opening_hours": pr.get("opening_hours"),
-            "address": pr.get("address", "Location only"),
+            "open_status": pr.get("open_status"),
+            "address": pr.get("address"),
             "phone": pr.get("phone"),
             "website": pr.get("website"),
             "why_it_matches": pr.get("why_it_matches", ""),
-            "score": round(new_score, 1),
-            "original_score": round(orig_score, 1),
-            "adjustments": adjustments,
+            "score": round(score, 1),
+            "breakdown": pr.get("breakdown"),
             "confidence": pr.get("confidence"),
             "confidence_details": pr.get("confidence_details"),
             "source": pr.get("source"),
+            "osm_tags": pr.get("osm_tags"),
+            "osm_id": pr.get("osm_id"),
+            "osm_type": pr.get("osm_type"),
         })
 
-    adjusted.sort(key=lambda r: r["score"], reverse=True)
-    filtered = [r for r in adjusted if r["score"] > 0]
+    adjusted.sort(key=lambda r: r.get("score", 0), reverse=True)
+
+    # Build note
+    changes = []
+    if exclude_food:
+        changes.append("removed food venues")
+    if exclude_nightlife:
+        changes.append("removed nightlife venues")
+    if exclude_shopping:
+        changes.append("removed shopping venues")
+    if want_cheaper:
+        changes.append("prioritized budget-friendly options")
+    if want_expensive:
+        changes.append("prioritized higher-end options")
+    if want_evening:
+        changes.append("prioritized evening/late options")
+    if want_culture:
+        changes.append("prioritized cultural venues")
+    if want_outdoors:
+        changes.append("prioritized outdoor venues")
+    if want_closer:
+        changes.append("prioritized closer options")
+    if want_farther:
+        changes.append("prioritized farther options")
+    if want_quick:
+        changes.append("prioritized shorter activities")
+
+    note = f"Refined: {', '.join(changes) if changes else 'general re-ranking'}."
+    note += f" {len(adjusted)} results."
 
     return {
         "refinement_applied": refinement,
-        "interpretation": _interpret_refinement(refinement),
-        "results": filtered[:30],
-        "note": f"Adjusted {len(prev_results)} results based on: '{refinement}'. "
-                f"Shows {len(filtered)} results with score > 0.",
+        "results": adjusted[:MAX_RESULTS],
+        "note": note,
     }
 
 
-def _interpret_refinement(refinement: str) -> dict:
-    r = refinement.lower()
-    changes = []
+def _format_scored_results(scored: list, prev_results: list) -> list:
+    """Convert ScoredResult objects to the standard result format."""
+    results = []
+    for r in scored:
+        place = r.place
+        tags = place.get("tags", {})
+        # Try to get original result data for fields we don't recompute
+        original = None
+        for pr in prev_results:
+            if pr.get("name") == place.get("name"):
+                original = pr
+                break
 
-    if any(w in r for w in ["cheaper", "budget", "save"]):
-        changes.append("Boosted budget-friendly options")
-    if any(w in r for w in ["expensive", "fancy", "upscale", "splurge"]):
-        changes.append("Prioritized higher-end options")
-    if any(w in r for w in ["food", "eat", "drink"]):
-        changes.append("Prioritized food & drink venues")
-    if any(w in r for w in ["no food", "not food"]):
-        changes.append("Removed food venues; boosted non-food options")
-    if any(w in r for w in ["after 8", "evening", "night", "late"]):
-        changes.append("Prioritized venues open in the evening")
-    if any(w in r for w in ["further", "further", "wider"]):
-        changes.append("Slightly boosted farther-away options")
-    if any(w in r for w in ["closer", "near", "nearby"]):
-        changes.append("Boosted nearby/closer options")
-    if any(w in r for w in ["morning", "early"]):
-        changes.append("Prioritized daytime activities")
-    if any(w in r for w in ["culture", "art", "museum"]):
-        changes.append("Prioritized cultural/arts venues")
-    if any(w in r for w in ["nature", "outdoors", "park"]):
-        changes.append("Prioritized outdoor/nature venues")
-    if any(w in r for w in ["shopping", "shop", "market"]):
-        changes.append("Prioritized shopping venues")
-    if any(w in r for w in ["alone", "solo"]):
-        changes.append("Boosted solo-friendly venues")
-    if any(w in r for w in ["friends", "group", "with"]):
-        changes.append("Boosted group-friendly venues")
-    if any(w in r for w in ["quick", "fast", "short"]):
-        changes.append("Prioritized shorter activities")
-    if any(w in r for w in ["long", "hours", "spend time"]):
-        changes.append("Prioritized longer activities")
+        website = sanitize_url(tags.get("website", "") or (original or {}).get("website", ""))
+        phone = tags.get("phone") or tags.get("contact:phone") or (original or {}).get("phone")
 
-    if not changes:
-        changes.append("General re-ranking based on refinement")
-
-    return {"what_user_meant": refinement, "changes_made": changes}
+        results.append({
+            "name": place.get("name", ""),
+            "category": place.get("category", "unknown"),
+            "lat": place.get("lat"),
+            "lon": place.get("lon"),
+            "distance_km": r.distance_km,
+            "estimated_time_hours": r.est_time,
+            "cost_estimate": r.cost_estimate,
+            "opening_hours": tags.get("opening_hours", "Unknown"),
+            "open_status": {
+                "is_open": r.open_status.is_open if r.open_status else None,
+                "status_text": r.open_status.status_text if r.open_status else "Unknown",
+                "next_open": r.open_status.next_open_text if r.open_status else "",
+            } if r.open_status else None,
+            "address": tags.get("addr:full")
+                       or tags.get("addr:street")
+                       or tags.get("address")
+                       or (original or {}).get("address")
+                       or None,
+            "phone": phone,
+            "website": website,
+            "osm_tags": {k: v for k, v in tags.items()
+                         if k not in ("name", "addr:full", "addr:street", "address",
+                                       "phone", "website", "contact:phone",
+                                       "opening_hours")},
+            "why_it_matches": r.why,
+            "score": r.score,
+            "breakdown": r.breakdown,
+            "confidence": r.confidence,
+            "confidence_details": r.confidence_details,
+            "source": place.get("source") or (original or {}).get("source"),
+            "osm_id": place.get("id") or (original or {}).get("osm_id"),
+            "osm_type": place.get("osm_type") or (original or {}).get("osm_type"),
+        })
+    return results
 
 
 # ── Error handler ──────────────────────────────────────────────────────────────

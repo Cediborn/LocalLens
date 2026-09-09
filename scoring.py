@@ -7,7 +7,10 @@ WHY something was ranked where it was.
 
 from dataclasses import dataclass, field
 from typing import Optional
+from datetime import datetime, timezone
 import math
+
+from opening_hours import get_open_status, OpenStatus
 
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -50,6 +53,22 @@ CATEGORY_COST_TIERS = {
     "hospital": ("free", (0, 0)),
     "doctor": ("varies", (5, 30)),
     "dentist": ("varies", (10, 50)),
+    "viewpoint": ("free", (0, 0)),
+    "nature_reserve": ("free", (0, 0)),
+    "beach": ("free", (0, 0)),
+    "gallery": ("budget", (5, 15)),
+    "studio": ("moderate", (10, 40)),
+    "workshop": ("moderate", (10, 30)),
+    "tourism": ("varies", (5, 50)),
+    "attraction": ("varies", (5, 50)),
+    "zoo": ("moderate", (10, 40)),
+    "amusement_ride": ("moderate", (10, 30)),
+    "casino": ("expensive", (20, 100)),
+    "food_court": ("budget", (5, 15)),
+    "biergarten": ("budget", (5, 20)),
+    "ice_cream": ("budget", (3, 10)),
+    "stripclub": ("expensive", (20, 80)),
+    "dance_floor": ("moderate", (10, 40)),
 }
 
 INTEREST_CATEGORY_MAP = {
@@ -92,6 +111,13 @@ INTEREST_KEYWORDS = {
     "group": ["friends", "group", "family", "together", "social", "team"],
 }
 
+# Food-related categories for "no food" refinement filtering
+FOOD_CATEGORIES = {"restaurant", "cafe", "fast_food", "bar", "pub", "nightclub",
+                   "food_court", "biergarten", "ice_cream"}
+
+# Valid interest whitelist
+VALID_INTERESTS = set(INTEREST_CATEGORY_MAP.keys())
+
 
 @dataclass
 class ScoredResult:
@@ -104,6 +130,7 @@ class ScoredResult:
     cost_estimate: dict = field(default_factory=dict)
     distance_km: float = 0.0
     est_time: float = 0.0
+    open_status: Optional[OpenStatus] = None
 
 
 def estimate_cost(place: dict, currency: str = "USD") -> dict:
@@ -117,6 +144,7 @@ def estimate_cost(place: dict, currency: str = "USD") -> dict:
         or "unknown"
     )
 
+    # Check for explicit OSM price data
     if "price_range" in tags:
         pr = tags["price_range"].lower()
         if any(w in pr for w in ["low", "budget", "cheap"]):
@@ -127,7 +155,8 @@ def estimate_cost(place: dict, currency: str = "USD") -> dict:
             tier, amount = "expensive", 70
         else:
             tier, amount = "varies", 30
-        return {"amount": amount, "currency": currency, "tier": tier, "source": "osm_price_range"}
+        return {"amount": amount, "currency": currency, "tier": tier,
+                "source": "osm_price_range", "verified": True}
 
     for cost_tag in ["fee", "entrance_fee", "min_price", "price"]:
         if cost_tag in tags:
@@ -135,7 +164,8 @@ def estimate_cost(place: dict, currency: str = "USD") -> dict:
                 val = float(tags[cost_tag])
                 if 0 <= val <= 500:
                     tier = "budget" if val < 15 else "moderate" if val < 40 else "expensive"
-                    return {"amount": val, "currency": currency, "tier": tier, "source": f"osm_{cost_tag}"}
+                    return {"amount": val, "currency": currency, "tier": tier,
+                            "source": f"osm_{cost_tag}", "verified": True}
             except (ValueError, TypeError):
                 pass
 
@@ -143,17 +173,22 @@ def estimate_cost(place: dict, currency: str = "USD") -> dict:
     if price_hint:
         val = str(price_hint).lower()
         if val in ("yes", "true", "cheap", "low"):
-            return {"amount": 10, "currency": currency, "tier": "budget", "source": "osm_price_hint"}
+            return {"amount": 10, "currency": currency, "tier": "budget",
+                    "source": "osm_price_hint", "verified": True}
         elif val in ("expensive", "high"):
-            return {"amount": 70, "currency": currency, "tier": "expensive", "source": "osm_price_hint"}
+            return {"amount": 70, "currency": currency, "tier": "expensive",
+                    "source": "osm_price_hint", "verified": True}
 
+    # Fall back to category estimates
     cat_lower = category.lower()
     for key, (tier, (lo, hi)) in CATEGORY_COST_TIERS.items():
         if key in cat_lower:
             amount = (lo + hi) / 2
-            return {"amount": round(amount), "currency": currency, "tier": tier, "source": "estimated_typical"}
+            return {"amount": round(amount), "currency": currency, "tier": tier,
+                    "source": "estimated_typical", "verified": False}
 
-    return {"amount": 20, "currency": currency, "tier": "varies", "source": "guess"}
+    return {"amount": 20, "currency": currency, "tier": "varies",
+            "source": "estimated_typical", "verified": False}
 
 
 def compute_distance_score(distance_m: float, max_distance_m: float) -> float:
@@ -164,8 +199,14 @@ def compute_distance_score(distance_m: float, max_distance_m: float) -> float:
 
 
 def compute_budget_score(cost_amount: float, budget_amount: float) -> float:
+    """
+    Budget scoring:
+    - budget_amount <= 0 means user didn't specify a budget → neutral score (0.5)
+    - cost_amount <= 0 means free place → always good (1.0)
+    - Otherwise, compare cost to budget
+    """
     if budget_amount <= 0:
-        return 0.0
+        return 0.5  # Neutral: user didn't specify budget
     if cost_amount <= 0:
         return 1.0
     ratio = cost_amount / budget_amount
@@ -179,7 +220,7 @@ def compute_budget_score(cost_amount: float, budget_amount: float) -> float:
 
 def compute_time_score(estimated_hours: float, available_hours: float) -> float:
     if available_hours <= 0:
-        return 0.0
+        return 0.5  # Neutral when no time specified
     if estimated_hours <= 0:
         return 1.0
     ratio = estimated_hours / available_hours
@@ -268,22 +309,30 @@ def _format_budget(cost_est: dict, budget_amount: float) -> str:
     tier = cost_est.get("tier", "unknown")
     amount = cost_est.get("amount", 0)
     curr = cost_est.get("currency", "")
+    is_estimated = not cost_est.get("verified", False)
+    est_prefix = "~" if is_estimated else ""
+
     if tier == "free":
-        return "free / nominal cost — great for your budget"
+        return "free / nominal cost"
+    elif budget_amount <= 0:
+        # No budget specified — just describe the cost without referencing a budget
+        return f"{est_prefix}{amount} {curr} (estimated)" if is_estimated else f"{amount} {curr}"
     elif tier == "budget":
-        return f"~{amount} {curr} — well within your {budget_amount} budget"
+        return f"{est_prefix}{amount} {curr} — well within your {budget_amount} {curr} budget"
     elif tier == "moderate":
-        return f"~{amount} {curr} — fits your {budget_amount} budget"
+        return f"{est_prefix}{amount} {curr} — fits your {budget_amount} {curr} budget"
     elif tier == "expensive":
-        return f"~{amount} {curr} — may stretch your {budget_amount} budget"
-    elif amount > budget_amount:
-        return f"~{amount} {curr} — over your {budget_amount} budget"
-    return f"~{amount} {curr}"
+        return f"{est_prefix}{amount} {curr} — may stretch your {budget_amount} {curr} budget"
+    elif budget_amount > 0 and amount > budget_amount:
+        return f"{est_prefix}{amount} {curr} — over your {budget_amount} {curr} budget"
+    return f"{est_prefix}{amount} {curr}" if is_estimated else f"{amount} {curr}"
 
 
 def _format_time(est_hours: float, available_hours: float) -> str:
     if est_hours <= 0.5:
-        return "~30 min — quick activity, lots of time leftover"
+        return "~30 min — quick activity"
+    elif available_hours <= 0:
+        return f"~{est_hours:.1f}h estimated duration"
     elif est_hours <= 1.0:
         return f"~{est_hours:.1f}h — fits comfortably in your {available_hours}h window"
     elif est_hours <= available_hours:
@@ -314,15 +363,28 @@ def _format_companion(alone: bool, comp_pct: float) -> str:
         return "may be better for solo visitors"
 
 
+def _format_open_status(open_status: Optional[OpenStatus]) -> str:
+    if not open_status or not open_status.has_hours_data:
+        return "hours not listed"
+    if open_status.is_open:
+        return "open now"
+    elif open_status.next_open_text:
+        return open_status.next_open_text.lower()
+    return "closed"
+
+
 def build_why(score: float, breakdown: dict, distance_km: float,
               cost_est: dict, est_time: float, available_hours: float,
-              matched_interests: list[str], alone: bool, budget_amount: float) -> str:
+              matched_interests: list[str], alone: bool, budget_amount: float,
+              open_status: Optional[OpenStatus] = None) -> str:
     parts = [f"{round(score * 10)}/10 match"]
     parts.append(_format_distance(distance_km))
     parts.append(_format_budget(cost_est, budget_amount))
     parts.append(_format_time(est_time, available_hours))
     parts.append(_format_interests(matched_interests))
     parts.append(_format_companion(alone, breakdown.get("companion_score", 0)))
+    if open_status and open_status.has_hours_data:
+        parts.append(_format_open_status(open_status))
     return f"{score:.1f}/10 — " + "; ".join(parts) + "."
 
 
@@ -335,6 +397,7 @@ def score_place(
     currency: str,
     alone: bool,
     interests: list[str],
+    check_time: Optional[datetime] = None,
 ) -> ScoredResult:
     tags = place.get("tags", {})
     lat = place.get("lat", place.get("latitude"))
@@ -385,6 +448,11 @@ def score_place(
     i_pct = interest_pct
     c_pct = compute_companion_score(place, alone)
 
+    # Compute opening status
+    if check_time is None:
+        check_time = datetime.now(timezone.utc)
+    open_status = get_open_status(tags.get("opening_hours"), check_time)
+
     breakdown = {
         "distance_score": round(d_pct, 3),
         "budget_score": round(b_pct, 3),
@@ -408,20 +476,27 @@ def score_place(
         c_pct * FACTOR_WEIGHT["companion"]
     ) * 10.0
 
-    confidence = "verified"
+    # Determine confidence honestly
+    confidence = "estimated"  # Default: most data is estimated
     confidence_details = {
         "name_source": "overpass_osm",
         "location_source": "overpass_osm",
         "cost_source": cost_est.get("source", "unknown"),
-        "hours_source": tags.get("opening_hours", "unknown") if "opening_hours" in tags else "unknown",
+        "cost_verified": cost_est.get("verified", False),
+        "hours_source": "overpass_osm" if "opening_hours" in tags else "unknown",
+        "hours_available": "opening_hours" in tags,
     }
-    if cost_est.get("source") == "guess":
-        confidence = "estimated"
-    if not tags.get("name"):
-        confidence = "estimated"
+
+    # Only mark as verified if the name and location come from OSM
+    # and the cost data is also from OSM (not estimated)
+    if tags.get("name") and cost_est.get("verified", False):
+        confidence = "verified"
+    elif not tags.get("name"):
+        confidence = "unknown"
 
     why = build_why(total, breakdown, distance_m / 1000, cost_est, est_time,
-                    available_hours, matched_interests, alone, budget_amount)
+                    available_hours, matched_interests, alone, budget_amount,
+                    open_status)
 
     return ScoredResult(
         place=place,
@@ -433,6 +508,7 @@ def score_place(
         cost_estimate=cost_est,
         distance_km=round(distance_m / 1000, 2),
         est_time=round(est_time, 1),
+        open_status=open_status,
     )
 
 
