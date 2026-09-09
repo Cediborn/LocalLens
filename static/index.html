@@ -450,6 +450,40 @@
   .nlp-submit:active { transform: translateY(0); }
   .nlp-submit:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
+  /* ── Quick options row ── */
+  .quick-options-row {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-top: 12px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+  .quick-options-row .field { flex: 1; min-width: 140px; margin: 0; }
+  .quick-options-row .budget-wrap { display: flex; gap: 6px; }
+  .quick-options-row .budget-wrap input { flex: 1; min-width: 0; }
+  .quick-options-row .budget-wrap select { width: 120px; flex-shrink: 0; }
+  .quick-options-row .open-now-field {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-end;
+    padding-bottom: 2px;
+  }
+  .quick-options-row .open-now-field .checkbox-item {
+    border: 2px solid var(--border);
+    padding: 10px 14px;
+    border-radius: 6px;
+    background: var(--surface2);
+    white-space: nowrap;
+  }
+  @media (max-width: 560px) {
+    .quick-options-row .field { min-width: 100%; }
+  }
+
   /* ── Advanced options toggle ── */
   .advanced-toggle {
     display: flex;
@@ -792,6 +826,63 @@
     padding: 3px 10px;
     border-radius: 4px;
     border: 1px solid rgba(108,140,255,0.2);
+  }
+
+  /* ── Result thumbnail / monogram ── */
+  .result-thumb {
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    position: relative;
+  }
+  .result-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    background: var(--surface2);
+  }
+  .thumb-mono {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--surface2);
+    letter-spacing: 0.5px;
+    position: relative;
+  }
+  .thumb-mono::after {
+    content: 'no photo';
+    position: absolute;
+    bottom: 3px;
+    font-size: 8px;
+    font-weight: 500;
+    color: #5a5f73;
+    letter-spacing: 0;
+  }
+
+  .result-rating {
+    font-size: 12px;
+    color: var(--yellow);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .result-rating .no-rating { color: var(--text-muted); }
+  .price-model {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-left: 4px;
+    font-weight: normal;
   }
 
   .result-score { display: flex; align-items: center; gap: 6px; margin-left: auto; }
@@ -1222,38 +1313,70 @@
       </button>
     </div>
 
+    <!-- Quick options: always visible -->
+    <div class="quick-options-row" id="quickOptions">
+      <div class="field">
+        <label for="budget">Budget <span class="hint">— blank = no limit</span></label>
+        <div class="budget-wrap">
+          <input type="number" id="budget" placeholder="No limit" min="0" step="1">
+          <select id="budgetCurrency" aria-label="Currency">
+            <option value="GHS" selected>GHS (GH₵)</option>
+            <option value="USD">USD ($)</option>
+            <option value="EUR">EUR (€)</option>
+            <option value="GBP">GBP (£)</option>
+            <option value="NGN">NGN (₦)</option>
+            <option value="KES">KES (KSh)</option>
+            <option value="ZAR">ZAR (R)</option>
+            <option value="AUD">AUD (A$)</option>
+            <option value="CAD">CAD (C$)</option>
+            <option value="INR">INR (₹)</option>
+            <option value="JPY">JPY (¥)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="maxDistance">Max distance <span class="hint">— km you'll travel</span></label>
+        <input type="number" id="maxDistance" placeholder="5" min="0.5" step="0.5">
+      </div>
+      <div class="field">
+        <label for="sortSelect">Sort by</label>
+        <select id="sortSelect" aria-label="Sort order">
+          <option value="">Best match</option>
+          <option value="distance">Closest</option>
+          <option value="price">Cheapest</option>
+          <option value="rating">Highest rated</option>
+        </select>
+      </div>
+      <div class="field open-now-field">
+        <label class="checkbox-item" for="openNowCb" title="Only show places open right now">
+          <input type="checkbox" id="openNowCb"> Open now
+        </label>
+      </div>
+    </div>
+
     <!-- Advanced options panel -->
     <div class="advanced-panel" id="advancedPanel">
       <div class="advanced-inner">
         <h2>Advanced Options</h2>
         <div class="form-grid">
           <div class="field">
-            <label for="budget">Budget <span class="hint">— how much to spend (blank = no limit)</span></label>
-            <input type="number" id="budget" placeholder="No limit" min="0" step="1">
-          </div>
-          <div class="field">
-            <label for="budgetCurrency">Currency</label>
-            <select id="budgetCurrency">
-              <option value="USD">USD ($)</option>
-              <option value="EUR">EUR (€)</option>
-              <option value="GBP">GBP (£)</option>
-              <option value="GHS">GHS (GH₵)</option>
-              <option value="NGN">NGN (₦)</option>
-              <option value="KES">KES (KSh)</option>
-              <option value="ZAR">ZAR (R)</option>
-              <option value="AUD">AUD (A$)</option>
-              <option value="CAD">CAD (C$)</option>
-              <option value="INR">INR (₹)</option>
-              <option value="JPY">JPY (¥)</option>
-            </select>
-          </div>
-          <div class="field">
             <label for="timeAvailable">Time available <span class="hint">— hours free</span></label>
             <input type="number" id="timeAvailable" placeholder="3" min="0.5" step="0.5">
           </div>
           <div class="field">
-            <label for="maxDistance">Max distance <span class="hint">— km you'll travel</span></label>
-            <input type="number" id="maxDistance" placeholder="5" min="0.5" step="0.5">
+            <label for="startTime">Available from <span class="hint">— optional, filters to what's open then</span></label>
+            <input type="time" id="startTime">
+          </div>
+          <div class="field">
+            <span class="field-label">Going alone?</span>
+            <div style="display:flex; gap:8px;" role="radiogroup" aria-label="Going alone?">
+              <label class="checkbox-item" style="flex:1; justify-content:center;">
+                <input type="radio" name="alone" value="true" checked> Yes, solo
+              </label>
+              <label class="checkbox-item" style="flex:1; justify-content:center;">
+                <input type="radio" name="alone" value="false"> With others
+              </label>
+            </div>
           </div>
           <div class="field full">
             <fieldset>
@@ -1276,21 +1399,6 @@
                 <label class="checkbox-item"><input type="checkbox" value="nightlife"> Nightlife</label>
               </div>
             </fieldset>
-          </div>
-          <div class="field">
-            <span class="field-label">Going alone?</span>
-            <div style="display:flex; gap:8px;" role="radiogroup" aria-label="Going alone?">
-              <label class="checkbox-item" style="flex:1; justify-content:center;">
-                <input type="radio" name="alone" value="true" checked> Yes, solo
-              </label>
-              <label class="checkbox-item" style="flex:1; justify-content:center;">
-                <input type="radio" name="alone" value="false"> With others
-              </label>
-            </div>
-          </div>
-          <div class="field">
-            <label for="startTime">Available from <span class="hint">— optional, filters to what's open then</span></label>
-            <input type="time" id="startTime">
           </div>
         </div>
       </div>
@@ -1348,17 +1456,17 @@
       <summary>How the scoring works</summary>
       <table>
         <tr><th>Factor</th><th>Weight</th><th>What it means</th></tr>
+        <tr><td>Relevance</td><td>35%</td><td>Matches what you searched for and your interests.</td></tr>
+        <tr><td>Budget fit</td><td>20%</td><td>How a real listed price fits your budget. Neutral when no price is listed.</td></tr>
         <tr><td>Distance</td><td>20%</td><td>Closer places score higher.</td></tr>
-        <tr><td>Budget</td><td>25%</td><td>How well the cost fits your budget (neutral if no budget set).</td></tr>
-        <tr><td>Time fit</td><td>20%</td><td>Duration vs your available time.</td></tr>
-        <tr><td>Interests</td><td>25%</td><td>Category + keyword match to interests.</td></tr>
-        <tr><td>Companion</td><td>10%</td><td>Solo vs group suitability.</td></tr>
+        <tr><td>Availability</td><td>15%</td><td>Open at your time + fits your available time window.</td></tr>
+        <tr><td>Quality</td><td>10%</td><td>Real rating (when available) + how complete the place's details are.</td></tr>
       </table>
     </details>
   </div>
 
   <footer class="site-footer">
-    <p>LocalLens · Data © OpenStreetMap contributors (ODbL) · Prices are estimates, not verified prices.</p>
+    <p>LocalLens · Data © OpenStreetMap contributors (ODbL) · Prices are shown only when listed in the data; "typical" levels are category references, not actual prices.</p>
   </footer>
 </main>
 
@@ -1693,72 +1801,25 @@
     return result;
   }
 
-  function nlpToSearchBody(parsed) {
+  function nlpToSearchBody(parsed, query) {
+    // The raw query goes to the backend; the backend is the authoritative
+    // intent resolver (categories, currency, budget hints, open-now, sort).
+    // These form fields are the *explicit* controls and always win.
+    const budgetVal = parseFloat($('budget').value);
+    const distVal = parseFloat($('maxDistance').value);
     const body = {
       location: userLocationName || '',
-      budget: 0,
-      budget_currency: $('budgetCurrency').value,
-      time_available_hours: 0,
-      interests: [],
-      alone: true,
-      max_distance_km: 5,
-      start_time: null
+      query: query || '',
+      budget: budgetVal > 0 ? budgetVal : 0,
+      budget_currency: $('budgetCurrency').value || 'GHS',
+      time_available_hours: parseFloat($('timeAvailable').value) || 0,
+      interests: parsed.interests.length > 0 ? parsed.interests : getInterests(),
+      alone: getAlone(),
+      max_distance_km: distVal > 0 ? distVal : 5,
+      start_time: $('startTime').value || null,
+      open_now: $('openNowCb').checked,
+      sort: $('sortSelect').value || '',
     };
-
-    // Apply NLP interests (use them, fall back to checked checkboxes)
-    if (parsed.interests.length > 0) {
-      body.interests = parsed.interests;
-    } else {
-      body.interests = getInterests();
-    }
-
-    // Apply NLP budget
-    if (parsed.budgetAmount) {
-      body.budget = parsed.budgetAmount;
-    } else {
-      const budgetVal = parseFloat($('budget').value);
-      body.budget = budgetVal > 0 ? budgetVal : 0;
-    }
-
-    if (parsed.budgetHint === 'cheap') {
-      if (body.budget === 0) body.budget = 15;
-    } else if (parsed.budgetHint === 'expensive') {
-      if (body.budget === 0) body.budget = 80;
-    }
-
-    // Apply NLP distance
-    if (parsed.distanceHint === 'close') {
-      body.max_distance_km = 2;
-    } else if (parsed.distanceHint === 'far') {
-      body.max_distance_km = 10;
-    } else {
-      body.max_distance_km = parseFloat($('maxDistance').value) || 5;
-    }
-
-    // Apply NLP time
-    if (parsed.timeHint === 'morning' || parsed.timeHint === 'afternoon') {
-      body.time_available_hours = parseFloat($('timeAvailable').value) || 3;
-    } else if (parsed.timeHint === 'evening') {
-      body.time_available_hours = parseFloat($('timeAvailable').value) || 4;
-    } else {
-      body.time_available_hours = parseFloat($('timeAvailable').value) || 3;
-    }
-
-    // Send the "Available from" time so the backend can check opening hours
-    const startTimeVal = $('startTime').value;
-    if (startTimeVal) {
-      body.start_time = startTimeVal;
-    }
-
-    // Apply NLP companion
-    if (parsed.companionHint === 'date' || parsed.companionHint === 'family') {
-      body.alone = false;
-    } else if (parsed.companionHint === 'group') {
-      body.alone = false;
-    } else {
-      body.alone = getAlone();
-    }
-
     return body;
   }
 
@@ -1834,16 +1895,31 @@
   }
 
   function fmtCost(est) {
-    if (!est || est.amount === undefined) return 'Unknown cost';
-    const { amount, currency, tier, verified } = est;
-    const symbols = { USD:'$', EUR:'€', GBP:'£', GHS:'GH₵', NGN:'₦', KES:'KSh',
-                      ZAR:'R', AUD:'A$', CAD:'C$', INR:'₹', JPY:'¥' };
-    const sym = symbols[currency] || currency + ' ';
-    if (tier === 'free') return 'Free';
-    const base = sym + Math.round(amount);
-    if (verified) return base;
-    if (!amount) return 'Free';
-    return base + '*';
+    if (!est) return 'Price not listed';
+    if (est.tier === 'free' || (est.amount !== undefined && est.amount !== null && est.amount === 0)) {
+      return 'Free';
+    }
+    if (est.amount !== undefined && est.amount !== null && est.amount > 0) {
+      const symbols = { USD:'$', EUR:'€', GBP:'£', GHS:'GH₵', NGN:'₦', KES:'KSh',
+                        ZAR:'R', AUD:'A$', CAD:'C$', INR:'₹', JPY:'¥' };
+      const sym = symbols[est.currency] || (est.currency || '') + ' ';
+      return sym + Math.round(est.amount);
+    }
+    if (est.available && est.tier && est.tier !== 'unknown' && est.tier !== 'quoted') {
+      return est.tier.charAt(0).toUpperCase() + est.tier.slice(1);
+    }
+    return 'Price not listed';
+  }
+
+  function initials(name) {
+    const words = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return '?';
+    let s = '';
+    for (let i = 0; i < Math.min(2, words.length); i++) {
+      const ch = words[i].charAt(0);
+      if (ch && ch !== '(' && ch !== '[') s += ch;
+    }
+    return s.toUpperCase() || '?';
   }
 
   function openStatusBadge(r) {
@@ -1932,7 +2008,29 @@
         websiteHtml = '<a href="' + escapeHtml(safeWebsite) + '" target="_blank" rel="noopener noreferrer" class="website-btn" title="Visit official website">🌐 Website</a>';
       }
 
-      const costIsEstimated = r.cost_estimate && !r.cost_estimate.verified && r.cost_estimate.tier !== 'free';
+      const costIsEstimated = r.cost_estimate && !r.cost_estimate.available && r.cost_estimate.typical_tier;
+      const typicalNote = costIsEstimated
+        ? '<div class="cost-note">* No price listed for this specific place. "Typically ' + escapeHtml(r.cost_estimate.typical_tier) + '" is a category-level reference and not the actual price.</div>'
+        : '';
+      const priceModelLabel = r.cost_estimate && r.cost_estimate.price_model_label
+        ? '<span class="price-model">(' + escapeHtml(r.cost_estimate.price_model_label) + ')</span>' : '';
+
+      let ratingHtml = '';
+      if (r.rating) {
+        ratingHtml = '<div class="result-rating">★ ' + r.rating.toFixed(1)
+          + (r.rating_count ? ' (' + r.rating_count + ' rating' + (r.rating_count !== 1 ? 's' : '') + ')' : '')
+          + ' <span class="no-rating">— community rating</span></div>';
+      } else {
+        ratingHtml = '<div class="result-rating"><span class="no-rating">No rating available</span></div>';
+      }
+
+      const mono = initials(r.name);
+      let thumbHtml;
+      if (r.image && safeUrl(r.image.thumb_url)) {
+        thumbHtml = '<div class="result-thumb"><img loading="lazy" src="' + escapeHtml(r.image.thumb_url) + '" alt="Photo of ' + escapeHtml(r.name) + '" onerror="this.outerHTML=\'<div class=&quot;thumb-mono&quot;>' + mono + '</div>\'"></div>';
+      } else {
+        thumbHtml = '<div class="result-thumb"><div class="thumb-mono">' + mono + '</div></div>';
+      }
 
       let mapLinkHtml = '';
       if (hasCoords) {
@@ -1945,14 +2043,16 @@
       html += '<div class="result-card' + (isTop ? ' top-match' : '') + '" id="card-' + i + '"' + (hasCoords ? ' data-lat="' + r.lat + '" data-lon="' + r.lon + '"' : '') + '>'
         + '<div class="result-top">'
         + '<div style="display:flex;align-items:flex-start;gap:10px;flex:1;">'
+        + thumbHtml
         + '<div class="score-ring ' + scoreClass + '" title="' + rankLabel + '">' + (isTop ? '★' : rowNum) + '</div>'
         + '<div>'
         + '<div class="result-name">' + escapeHtml(r.name) + '</div>'
         + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px;">'
-        + '<span class="result-category">' + escapeHtml(r.category) + '</span>'
+        + '<span class="result-category">' + escapeHtml(r.category_label || r.category) + '</span>'
         + openStatusBadge(r)
         + '<span class="confidence-badge ' + confidenceClass(r.confidence) + '" title="' + confidenceTooltip(r) + '">' + confidenceLabel(r.confidence) + '</span>'
         + '</div>'
+        + ratingHtml
         + (address ? '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">📍 ' + escapeHtml(address) + '</div>' : '')
         + '</div></div>'
         + '<div class="result-score"><div class="score-ring ' + scoreClass + '">' + r.score.toFixed(1) + '</div></div>'
@@ -1960,18 +2060,18 @@
         + '<div class="result-details">'
         + '<div class="detail"><span class="label">📍</span><span class="value">' + fmtDistance(r.distance_km) + '</span></div>'
         + '<div class="detail"><span class="label">⏱</span><span class="value">' + fmtTime(r.estimated_time_hours) + '</span></div>'
-        + '<div class="detail"><span class="label">💰</span><span class="value" title="' + (costIsEstimated ? 'Estimated typical price for this category' : '') + '">' + fmtCost(r.cost_estimate) + '</span></div>'
+        + '<div class="detail"><span class="label">💰</span><span class="value" title="' + (costIsEstimated ? 'Category-level typical, not the actual price' : '') + '">' + fmtCost(r.cost_estimate) + '</span>' + priceModelLabel + '</div>'
         + '<div class="detail"><span class="label">🕐</span><span class="value">' + formatOpeningHours(r.opening_hours) + '</span></div>'
         + (r.phone ? '<div class="detail"><span class="label">📞</span><span class="value">' + escapeHtml(r.phone) + '</span></div>' : '')
         + '</div>'
         + '<div class="result-why">' + escapeHtml(r.why_it_matches) + '</div>'
-        + (costIsEstimated ? '<div class="cost-note">* Estimated typical price for this category — not a verified price.</div>' : '')
+        + typicalNote
         + '<div class="breakdown">'
-        + '<div class="breakdown-item"><span>Distance</span><div class="breakdown-bar"><div class="breakdown-fill" style="width:' + ((r.breakdown?.distance_score||0)*100) + '%"></div></div><span>' + (r.breakdown?.distance_score||0).toFixed(2) + '</span></div>'
+        + '<div class="breakdown-item"><span>Relevance</span><div class="breakdown-bar"><div class="breakdown-fill" style="width:' + ((r.breakdown?.relevance_score||0)*100) + '%"></div></div><span>' + (r.breakdown?.relevance_score||0).toFixed(2) + '</span></div>'
         + '<div class="breakdown-item"><span>Budget</span><div class="breakdown-bar"><div class="breakdown-fill" style="width:' + ((r.breakdown?.budget_score||0)*100) + '%"></div></div><span>' + (r.breakdown?.budget_score||0).toFixed(2) + '</span></div>'
-        + '<div class="breakdown-item"><span>Time</span><div class="breakdown-bar"><div class="breakdown-fill" style="width:' + ((r.breakdown?.time_score||0)*100) + '%"></div></div><span>' + (r.breakdown?.time_score||0).toFixed(2) + '</span></div>'
-        + '<div class="breakdown-item"><span>Interests</span><div class="breakdown-bar"><div class="breakdown-fill" style="width:' + ((r.breakdown?.interest_score||0)*100) + '%"></div></div><span>' + (r.breakdown?.interest_score||0).toFixed(2) + '</span></div>'
-        + '<div class="breakdown-item"><span>Companion</span><div class="breakdown-bar"><div class="breakdown-fill" style="width:' + ((r.breakdown?.companion_score||0)*100) + '%"></div></div><span>' + (r.breakdown?.companion_score||0).toFixed(2) + '</span></div>'
+        + '<div class="breakdown-item"><span>Distance</span><div class="breakdown-bar"><div class="breakdown-fill" style="width:' + ((r.breakdown?.distance_score||0)*100) + '%"></div></div><span>' + (r.breakdown?.distance_score||0).toFixed(2) + '</span></div>'
+        + '<div class="breakdown-item"><span>Availability</span><div class="breakdown-bar"><div class="breakdown-fill" style="width:' + ((r.breakdown?.availability_score||0)*100) + '%"></div></div><span>' + (r.breakdown?.availability_score||0).toFixed(2) + '</span></div>'
+        + '<div class="breakdown-item"><span>Quality</span><div class="breakdown-bar"><div class="breakdown-fill" style="width:' + ((r.breakdown?.quality_score||0)*100) + '%"></div></div><span>' + (r.breakdown?.quality_score||0).toFixed(2) + '</span></div>'
         + '</div>'
         + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;">'
         + websiteHtml + mapLinkHtml
@@ -2127,7 +2227,7 @@
     }
 
     const parsed = parseNLP(query);
-    const body = nlpToSearchBody(parsed);
+    const body = nlpToSearchBody(parsed, query);
     body.location = userLocationName;
 
     showLoading(true, 'Searching OpenStreetMap for places near you...');
@@ -2276,6 +2376,10 @@
   // NLP Search
   nlpSubmit.addEventListener('click', doSearch);
   nlpInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+  // Quick controls re-run the search with explicit values
+  $('#sortSelect').addEventListener('change', () => { if (geoResolved && nlpInput.value.trim()) doSearch(); });
+  $('#openNowCb').addEventListener('change', () => { if (geoResolved && nlpInput.value.trim()) doSearch(); });
 
   // Advanced toggle
   advancedToggle.addEventListener('click', () => {
