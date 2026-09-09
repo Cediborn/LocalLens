@@ -93,8 +93,9 @@ const SquircleShift = (() => {
      ══════════════════════════════════════════════════════════════════════ */
   let canvas, ctx, animId, _resizeHandler, _mouseHandler, _touchHandler, _leaveHandler;
   let opts = { ...defaults };
-  let dpr = 1, w = 0, h = 0;
+  let w = 0, h = 0;
   let time = 0;
+  let lastFrame = 0;
 
   // Cursor state — smooth, momentum-based tracking
   let cursorRawX = -9999, cursorRawY = -9999;   // actual pointer
@@ -119,6 +120,12 @@ const SquircleShift = (() => {
 
   function lerp(a, b, t) { return a + (b - a) * t; }
   function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+  /** The canvas is only worth drawing when it is actually visible. */
+  function isCanvasVisible() {
+    return !!canvas && canvas.clientWidth > 0 && canvas.clientHeight > 0 &&
+           document.visibilityState === 'visible';
+  }
 
   /** Superellipse: |x/a|^n + |y/b|^n = 1 */
   function superellipseXY(cx, cy, rx, ry, n, steps) {
@@ -193,11 +200,28 @@ const SquircleShift = (() => {
 
   /* ══════════════════════════════════════════════════════════════════════
      Core renderer
-     ══════════════════════════════════════════════════════════════════════ */
+     ══════════════════════════════════════════════════════════════════════
+
+     Performance notes (this is a full-screen decorative background, so it
+     must never compete with the UI thread):
+      - The loop wakes only when the canvas is actually visible.
+      - Frames are capped at ~30fps.
+      - The backing buffer is resolution-capped (see `resize`).
+      - `ctx.shadowBlur` is the single most expensive 2D canvas op and was
+        the original cause of multi-second freezes; the glow is now drawn
+        with additive ('lighter') compositing, which is nearly free.
+  */
   function render() {
     if (!canvas || !ctx) return;
+    animId = requestAnimationFrame(render);
 
-    const rawDt = 0.016;
+    if (!isCanvasVisible()) return;
+
+    const now = performance.now();
+    if (now - lastFrame < 33) return; // ~30 fps cap
+    lastFrame = now;
+
+    const rawDt = 0.033;
     const dt = rawDt * opts.speed;
     time += dt;
 
@@ -213,14 +237,14 @@ const SquircleShift = (() => {
     const cx = w / 2;
     const cy = h / 2;
 
-    // ── Grid layout ──
-    const cols = Math.max(4, Math.round(opts.gridFrequency));
+    // ── Grid layout (soft cap on cell count) ──
+    const cols = Math.max(6, Math.min(Math.round(opts.gridFrequency), 13));
     const rows = Math.max(3, Math.round(cols * (h / w)));
     const cellW = w / cols;
     const cellH = h / rows;
     const baseR = Math.min(cellW, cellH) * 0.30;
 
-    const steps = 36; // points per superellipse
+    const steps = 24; // points per superellipse
 
     // Noise spatial scale
     const noiseScale = 0.0025;
@@ -230,6 +254,9 @@ const SquircleShift = (() => {
     const tFast  = time * 0.55;  // quick shimmer
 
     // ── Render each cell ──
+    // Additive blending recreates the glow cheaply without shadowBlur.
+    ctx.globalCompositeOperation = 'lighter';
+
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         const baseX = (col + 0.5) * cellW;
@@ -325,17 +352,14 @@ const SquircleShift = (() => {
 
           // ── Fill ──
           superellipseXY(posX, posY, lr * rxMod, lr * ryMod, morphN, steps);
-          const fillA = 0.12 + cellBrightness * 0.08;
+          const fillA = 0.08 + cellBrightness * 0.05;
           ctx.fillStyle = `rgba(${Math.round(cr)},${Math.round(cg)},${Math.round(cb)},${fillA})`;
           ctx.fill();
 
-          // ── Stroke (glowing outline) ──
+          // ── Stroke (glowing outline) — additive, no shadowBlur ──
           superellipseXY(posX, posY, lr * rxMod, lr * ryMod, morphN, steps);
-          ctx.strokeStyle = `rgba(${Math.round(cr)},${Math.round(cg)},${Math.round(cb)},0.75)`;
-          ctx.lineWidth = opts.lineThickness * cellR * 1.8;
-          const glowSize = 4 + cellBrightness * 10;
-          ctx.shadowColor = `rgb(${Math.round(cr)},${Math.round(cg)},${Math.round(cb)})`;
-          ctx.shadowBlur = glowSize;
+          ctx.strokeStyle = `rgba(${Math.round(cr)},${Math.round(cg)},${Math.round(cb)},0.22)`;
+          ctx.lineWidth = opts.lineThickness * cellR * 2.4;
           ctx.stroke();
 
           ctx.restore();
@@ -344,13 +368,12 @@ const SquircleShift = (() => {
     }
 
     // ── Vignette overlay (darker edges, keeps center readable) ──
+    ctx.globalCompositeOperation = 'source-over';
     const vGrad = ctx.createRadialGradient(cx, cy, Math.min(w,h) * 0.25, cx, cy, Math.max(w,h) * 0.7);
     vGrad.addColorStop(0, 'rgba(15,17,23,0)');
     vGrad.addColorStop(1, 'rgba(15,17,23,0.55)');
     ctx.fillStyle = vGrad;
     ctx.fillRect(0, 0, w, h);
-
-    animId = requestAnimationFrame(render);
   }
 
   /* ══════════════════════════════════════════════════════════════════════
@@ -361,18 +384,22 @@ const SquircleShift = (() => {
     if (!canvas) { console.warn(`[SquircleShift] Canvas "${canvasId}" not found.`); return; }
     ctx = canvas.getContext('2d');
     opts = { ...defaults, ...options };
-    dpr = window.devicePixelRatio || 1;
 
     function resize() {
       const parent = canvas.parentElement || document.body;
       const rect = parent.getBoundingClientRect();
       w = rect.width;
       h = rect.height;
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
+      // Cap the backing buffer: never render above ~1400px wide regardless
+      // of devicePixelRatio. The canvas is stretched with CSS, so the UI
+      // avoids huge GPU fills on high-DPI screens.
+      const deviceScale = window.devicePixelRatio || 1;
+      const scale = Math.max(0.5, Math.min(deviceScale, 1400 / Math.max(w, 1)));
+      canvas.width = Math.max(1, Math.round(w * scale));
+      canvas.height = Math.max(1, Math.round(h * scale));
       canvas.style.width = w + 'px';
       canvas.style.height = h + 'px';
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
       initHotspots();
     }
 
