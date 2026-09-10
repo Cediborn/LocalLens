@@ -759,6 +759,38 @@
     border-color: var(--accent);
   }
 
+  .intent-strip {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .intent-strip .intent-legend {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-right: 2px;
+  }
+  .intent-chip {
+    background: rgba(62,207,142,0.08);
+    border: 1px solid rgba(62,207,142,0.3);
+    color: var(--green);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 12px;
+  }
+  .intent-chip.intent-strong {
+    background: rgba(62,207,142,0.16);
+    border-color: var(--green);
+  }
+  .intent-chip.intent-weak {
+    background: rgba(240,185,11,0.08);
+    border: 1px solid rgba(240,185,11,0.35);
+    color: var(--yellow);
+  }
+
   .confidence-badge {
     display: inline-block;
     padding: 2px 8px;
@@ -1419,6 +1451,7 @@
     <!-- Results area -->
     <div id="resultsArea" class="hidden">
       <div id="suggestionChips" class="suggestion-chips hidden"></div>
+      <div id="intentStrip" class="intent-strip hidden"></div>
       <div class="card" style="background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;box-shadow:var(--shadow);">
         <div class="results-header">
           <div class="results-count" id="resultsCount"></div>
@@ -1562,6 +1595,7 @@
   const advancedPanel = $('advancedPanel');
   const errorBox = $('errorBox');
   const resultsArea = $('resultsArea');
+  const intentStrip = $('intentStrip');
   const resultsList = $('resultsList');
   const resultsCount = $('resultsCount');
   const coverageNote = $('coverageNote');
@@ -1997,7 +2031,53 @@
   // ════════════════════════════════════════════
   // RESULTS RENDERER
   // ════════════════════════════════════════════
+  function renderIntentStrip(query) {
+    const ri = query && query.resolved_intent;
+    if (!ri) {
+      intentStrip.classList.add('hidden');
+      return;
+    }
+    const chips = [];
+    if (ri.category) {
+      chips.push({
+        text: (ri.ambiguous ? 'Maybe: ' : '') + escapeHtml(ri.category.replace(/_/g, ' ')),
+        strong: !ri.ambiguous
+      });
+    }
+    if (ri.subcategory) chips.push({ text: escapeHtml(ri.subcategory), strong: true });
+    if (ri.labels && ri.labels.length && ri.category !== ri.labels[0]) {
+      chips.push({ text: escapeHtml(ri.labels.slice(0, 3).join(' · ')), strong: false });
+    }
+    if (ri.budget && (ri.budget.amount != null || (ri.budget.preference && ri.budget.preference !== 'none'))) {
+      const b = ri.budget;
+      let bt = '';
+      if (b.preference && b.preference !== 'none') bt += b.preference + ' ';
+      if (b.amount != null) bt += 'under ' + b.amount + ' ' + (b.currency || 'GHS');
+      if (bt.trim()) chips.push({ text: escapeHtml(bt.trim()), strong: false });
+    }
+    if (ri.distance && ri.distance.max_distance) {
+      chips.push({ text: escapeHtml('within ' + ri.distance.max_distance + ' km'), strong: false });
+    }
+    if (ri.open_now) chips.push({ text: 'open now', strong: false });
+    if (ri.rating && ri.rating.minimum) {
+      chips.push({ text: escapeHtml(ri.rating.minimum + '+ stars'), strong: false });
+    }
+    if (ri.ambiguous) {
+      chips.push({ text: 'ambiguous — trying a few interpretations', strong: false });
+    }
+
+    if (!chips.length) {
+      intentStrip.classList.add('hidden');
+      return;
+    }
+    intentStrip.innerHTML = '<span class="intent-legend">I understood</span>' + chips.map(c =>
+      '<span class="intent-chip' + (c.strong ? ' intent-strong' : '') + '">' + c.text + '</span>'
+    ).join('');
+    intentStrip.classList.remove('hidden');
+  }
+
   function renderResults(results, query) {
+    renderIntentStrip(query);
     if (!results || results.length === 0) {
       resultsList.innerHTML = `
         <div class="empty-state">
@@ -2393,6 +2473,7 @@
     coverageNote.classList.add('hidden');
     mapContainer.classList.add('hidden');
     suggestionChips.classList.add('hidden');
+    intentStrip.classList.add('hidden');
     lastResults = [];
     lastQuery = null;
   }

@@ -34,7 +34,7 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import httpx
 
-from scoring import score_place, extract_place_data, haversine_m
+from scoring import score_place, extract_place_data, haversine_m, relevance_pass
 from categories import (
     tags_for_keys,
     category_label,
@@ -444,6 +444,7 @@ async def resolve_query(body: dict):
     intent = Intent(query)
     return {
         "query": query,
+        "structured": intent.to_structured(),
         "intent": intent.to_overrides(),
         "categories": [category_label(c) for c in intent.categories[:6]],
         "start_time": hour_from_hint(intent.time_hint),
@@ -489,6 +490,28 @@ async def recommend(body: dict):
     query_labels = []
     if intent:
         query_labels = [category_label(c, singular=True) for c in intent.categories[:4]]
+    specific = bool(intent) and intent.specific
+    relevance_keywords = []
+    if intent:
+        relevance_keywords = list(
+            dict.fromkeys(intent.keywords + intent.subcategory_keywords))
+    resolved_intent = None
+    if intent:
+        resolved_intent = {
+            "category": intent.structured.category,
+            "categories": list(intent.categories),
+            "subcategory": intent.structured.subcategory,
+            "keywords": list(intent.keywords),
+            "budget": dict(intent.structured.budget),
+            "distance": dict(intent.structured.distance),
+            "rating": dict(intent.structured.rating),
+            "location": dict(intent.structured.location),
+            "open_now": intent.structured.open_now,
+            "time_hint": intent.structured.time_hint,
+            "confidence": intent.confidence,
+            "ambiguous": intent.ambiguous,
+            "labels": query_labels,
+        }
 
     # ── Validate + clamp ──
     max_distance_km = max(0.5, min(max_distance_km, 50.0))
@@ -544,7 +567,9 @@ async def recommend(body: dict):
         sort = intent.sort if intent and intent.sort else None
 
     # ── Radius tuning from distance hints ──
-    if intent and intent.distance_hint == "close":
+    if intent and intent.structured.distance.get("max_distance"):
+        radius_m = max(500.0, min(intent.max_distance_km * 1000, 50000.0))
+    elif intent and intent.distance_hint == "close":
         radius_m = min(max_distance_m, 3000)
     elif intent and intent.distance_hint == "far":
         radius_m = max(max_distance_m, 10000)
@@ -579,7 +604,7 @@ async def recommend(body: dict):
         return _empty_response(location, geo_result, budget, currency,
                                time_available, interests, alone, max_distance_km,
                                start_time, open_now, sort, query, time_aware,
-                               radius_m, query_labels)
+                               radius_m, resolved_intent)
 
     # ── Score ──
     user_constraints = {"lat": user_lat, "lon": user_lon}
@@ -598,8 +623,18 @@ async def recommend(body: dict):
             intent_categories=category_keys,
             budget_hint=budget_hint,
             time_aware=time_aware,
+            relevance_keywords=relevance_keywords,
         )
         scored.append(result)
+
+    # ── Hard relevance gate for specific intents ──
+    # A category mismatch must not survive on rating/distance alone
+    # (the audit's 4.6/10 pharmacy problem).
+    if specific:
+        scored = [r for r in scored if relevance_pass(
+            r.breakdown["relevance_score"],
+            r.breakdown["factors"].get("matched_categories", []),
+            specific=True)]
 
     # ── Time-aware ordering (keeps open/unknown/closed as before) ──
     if time_aware:
@@ -672,7 +707,7 @@ async def recommend(body: dict):
         "query": _query_echo(location, geo_result, budget, currency,
                              time_available, interests, alone, max_distance_km,
                              start_time, open_now, sort, query, time_aware,
-                             query_labels),
+                             resolved_intent),
         "results": results,
         "data_sources": ["nominatim_osm", "overpass_osm"],
         "coverage": {
@@ -1049,14 +1084,14 @@ def _format_result(r) -> dict:
 
 def _query_echo(location, geo_result, budget, currency, time_available,
                 interests, alone, max_distance_km, start_time, open_now,
-                sort, query, time_aware, query_labels=None) -> dict:
+                sort, query, time_aware, resolved_intent=None) -> dict:
     return {
         "location": location,
         "geocoded_to": geo_result.get("display_name"),
         "lat": geo_result.get("lat"),
         "lon": geo_result.get("lon"),
         "query": query,
-        "resolved_intent": query_labels or None,
+        "resolved_intent": resolved_intent,
         "budget": budget,
         "budget_currency": currency,
         "time_available_hours": time_available,
@@ -1072,12 +1107,12 @@ def _query_echo(location, geo_result, budget, currency, time_available,
 
 def _empty_response(location, geo_result, budget, currency, time_available,
                     interests, alone, max_distance_km, start_time, open_now,
-                    sort, query, time_aware, radius_m, query_labels=None):
+                    sort, query, time_aware, radius_m, resolved_intent=None):
     return {
         "query": _query_echo(location, geo_result, budget, currency,
                              time_available, interests, alone, max_distance_km,
                              start_time, open_now, sort, query, time_aware,
-                             query_labels),
+                             resolved_intent),
         "results": [],
         "data_sources": ["nominatim_osm"],
         "coverage": {

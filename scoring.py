@@ -51,6 +51,21 @@ FACTOR_WEIGHT = {
 TIER_RANK = {"free": 0.0, "budget": 1.0, "moderate": 2.0, "expensive": 3.0,
              "unknown": 2.0}
 
+# Hard relevance floor for *specific* intents (resolved category, not
+# ambiguous): a place below this is a category mismatch and must not survive
+# on rating/distance alone. Broad/vague queries are exempt.
+RELEVANCE_GATE = 0.30
+
+# Words too generic to prove relevance from a name/description alone.
+# Without filtering, "Company" in a name would match almost any business.
+WEAK_TEXT_WORDS = {
+    "company", "companies", "store", "stores", "shop", "shops", "centre",
+    "center", "service", "services", "place", "places", "area", "spot",
+    "spots", "club", "studio", "experience", "limited", "ltd", "ghana",
+    "accra", "mate", "house", "corner", "works", "enterprise",
+    "enterprises", "and", "the", "for", "of", "in", "on", "at",
+}
+
 
 # ── Real price extraction ─────────────────────────────────────────────────────
 
@@ -260,45 +275,93 @@ def compute_availability_score(open_status: Optional[OpenStatus],
     return 0.5 * open_part + 0.5 * time_part
 
 
+def _text_tokens(text: str) -> set[str]:
+    return set(re.findall(r"[a-z][a-z0-9-]{1,}", text.lower()))
+
+
+def _keyword_boost(place: dict, keyword_tokens: list[str]) -> tuple[float, list[str]]:
+    """Favour places whose name/cuisine/description mention the user's own
+    keywords and subcategory words ('iphone', 'waakye', 'residential')."""
+    if not keyword_tokens:
+        return 0.0, []
+    tags = place.get("tags", {})
+    fields = ("name", "operator", "brand", "cuisine", "description",
+              "description:en", "description:de")
+    text = " ".join(str(tags.get(k, "") or "") for k in fields)
+    toks = _text_tokens(text)
+    hits: list[str] = []
+    for kw in keyword_tokens:
+        kwl = kw.lower()
+        if len(kwl) < 3 or kwl in WEAK_TEXT_WORDS:
+            continue
+        if kwl in toks:
+            hits.append(kwl)
+            continue
+        for tkn in toks:
+            if tkn == kwl:
+                hits.append(kwl)
+                break
+            if len(kwl) >= 4 and tkn.startswith(kwl):
+                hits.append(kwl)
+                break
+            if len(tkn) >= 4 and kwl.startswith(tkn):
+                hits.append(kwl)
+                break
+    if not hits:
+        return 0.0, []
+    return round(min(0.25, 0.06 * len(set(hits))), 3), sorted(set(hits))
+
+
 def compute_relevance_score(place: dict, intent_categories: list[str],
-                            interests: list[str]) -> tuple[float, list[str]]:
+                            interests: list[str],
+                            keyword_tokens: Optional[list[str]] = None
+                            ) -> tuple[float, list[str]]:
     """
     How well the place matches the user's stated intent. The query drives
     this; a place outside the intent gets a low relevance and sinks.
+
+    Specific resolved intents are hard-gated upstream (see relevance_pass);
+    broad/vague queries keep a neutral, label-less relevance.
     """
     q_matched = matched_categories_for_place(place, intent_categories)
-    i_matched = []
+    interest_keys: list[str] = []
     if interests:
-        interest_keys = []
         for interest in interests:
             interest_keys.extend(INTEREST_CATEGORY_MAP.get(interest, []))
-        i_matched = matched_categories_for_place(place, interest_keys)
+    i_matched = matched_categories_for_place(place, interest_keys)
 
+    if not intent_categories and not interest_keys:
+        return 0.7, []  # genuinely vague (no query-derived intent) -> neutral
+
+    labels: list[str] = []
     if q_matched:
         labels = sorted({category_label(k, singular=True) for k in q_matched})
-        return 1.0, labels
-    if i_matched:
+        base = 0.88
+    elif i_matched:
         labels = sorted({category_label(k, singular=True) for k in i_matched})
-        return 0.85, labels
-
-    combined = list(intent_categories) + (
-        [k for i in interests for k in INTEREST_CATEGORY_MAP.get(i, [])])
-    if combined:
-        family = matched_categories_for_place_family(place, combined)
+        base = 0.85
+    else:
+        family = matched_categories_for_place_family(
+            place, list(intent_categories))
         if family:
-            return 0.65, [category_label(f, singular=True) for f in family[:2]]
-        # Weak text-level match: category label appears in name/cuisine/tags
-        tags = place.get("tags", {})
-        text = " ".join(str(tags.get(k, "")) for k in
-                        ("name", "cuisine", "amenity", "leisure", "shop",
-                         "tourism")).lower()
-        for ck in combined:
-            words = category_label(ck, singular=True).lower().split()
-            for w in words:
-                if w in text and len(w) > 3:
-                    return 0.55, [category_label(ck, singular=True)]
-        return 0.1, []
-    return 0.7, []  # genuinely vague query -> broad neutral
+            labels = [category_label(f, singular=True) for f in family[:2]]
+            base = 0.70
+        else:
+            base = 0.15
+
+    boost, hit_keywords = _keyword_boost(place, keyword_tokens or [])
+    relevance = min(1.0, base + boost)
+    return round(relevance, 3), labels
+
+
+def relevance_pass(relevance: float, labels: list[str],
+                   specific: bool = False) -> bool:
+    """Hard relevance gate. Broad/vague queries always pass; specific
+    intents require a real category match so a 5-star pharmacy can never
+    rescue a construction query."""
+    if not specific:
+        return True
+    return relevance >= RELEVANCE_GATE and bool(labels)
 
 
 def compute_quality_score(place: dict, cost_est: dict, rating: Optional[float],
@@ -474,6 +537,7 @@ def score_place(
     budget_hint: Optional[str] = None,
     time_aware: bool = False,
     has_image: bool = False,
+    relevance_keywords: Optional[list[str]] = None,
 ) -> ScoredResult:
     tags = place.get("tags", {})
     lat = place.get("lat", place.get("latitude"))
@@ -505,7 +569,9 @@ def score_place(
            " " + (tags.get("craft", "") or "")).lower()
     est_time = estimate_duration_hours(cat)
 
-    relevance, matched_labels = compute_relevance_score(place, intent_categories, interests)
+    relevance, matched_labels = compute_relevance_score(
+        place, intent_categories, interests,
+        keyword_tokens=relevance_keywords)
     budget_pct = compute_budget_score(cost_est, budget_amount, budget_hint)
     distance_pct = compute_distance_score(distance_m, max_distance_m)
     availability_pct = compute_availability_score(

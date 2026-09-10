@@ -46,6 +46,7 @@ PRICE_MODEL_LABELS = {
 NIGHTS = [
     ("tourism", "hotel"), ("tourism", "motel"), ("tourism", "guest_house"),
     ("tourism", "bed_and_breakfast"), ("tourism", "chalet"),
+    ("tourism", "resort"), ("tourism", "apartment"),
 ]
 
 CATALOG = {
@@ -181,7 +182,8 @@ CATALOG = {
     },
     "phone_repair": {
         "label": "Phone & electronics repair", "singular": "Repair shop",
-        "tags": [("craft", "electronics_repair"), ("shop", "mobile_phone"),
+        "tags": [("craft", "electronics_repair"), ("craft", "telephone_repair"),
+                 ("craft", "laptop"), ("shop", "mobile_phone"),
                  ("shop", "computer")],
         "price_model": "per_service", "typical_tier": "budget",
     },
@@ -202,7 +204,8 @@ CATALOG = {
     },
     "hardware": {
         "label": "Hardware stores", "singular": "Hardware store",
-        "tags": [("shop", "hardware"), ("shop", "doityourself")],
+        "tags": [("shop", "hardware"), ("shop", "doityourself"),
+                 ("shop", "building_materials"), ("shop", "lumber")],
         "price_model": "per_item", "typical_tier": "budget",
     },
     "jewelry": {
@@ -507,7 +510,7 @@ CATALOG = {
     },
     "bank": {
         "label": "Banks", "singular": "Bank",
-        "tags": [("amenity", "bank")],
+        "tags": [("amenity", "bank"), ("amenity", "microfinance")],
         "price_model": "free", "typical_tier": "free",
     },
     "atm": {
@@ -519,6 +522,17 @@ CATALOG = {
         "label": "Money transfer & exchange", "singular": "Money transfer",
         "tags": [("amenity", "bureau_de_change"), ("amenity", "money_transfer")],
         "price_model": "per_service", "typical_tier": "budget",
+    },
+    "insurance": {
+        "label": "Insurance", "singular": "Insurance company",
+        "tags": [("office", "insurance"), ("office", "insurance_agent")],
+        "price_model": "variable", "typical_tier": "moderate",
+    },
+    "medical_lab": {
+        "label": "Medical labs & diagnostics", "singular": "Medical lab",
+        "tags": [("healthcare", "laboratory"), ("amenity", "laboratory"),
+                 ("healthcare", "diagnostic_centre")],
+        "price_model": "per_service", "typical_tier": "moderate",
     },
     "police": {
         "label": "Police stations", "singular": "Police station",
@@ -554,6 +568,111 @@ CATALOG = {
         "label": "Real estate agencies", "singular": "Real estate agency",
         "tags": [("office", "estate_agent")],
         "price_model": "variable", "typical_tier": "moderate",
+    },
+
+    # ── Construction & trades ──
+    "construction_company": {
+        "label": "Construction companies & builders", "singular": "Construction company",
+        "tags": [
+            ("office", "architect"), ("office", "engineering"),
+            ("office", "structural_engineer"), ("office", "quantity_surveyor"),
+            ("craft", "builder"), ("craft", "mason"), ("craft", "stonemason"),
+            ("craft", "electrician"), ("craft", "plumber"), ("craft", "carpenter"),
+            ("craft", "painter"), ("craft", "roofer"), ("craft", "tiler"),
+            ("craft", "welder"), ("craft", "glazier"), ("craft", "floorer"),
+        ],
+        "price_model": "per_service", "typical_tier": "moderate",
+    },
+    "building_materials": {
+        "label": "Building materials", "singular": "Building materials store",
+        "tags": [("shop", "building_materials"), ("shop", "lumber"),
+                 ("shop", "doityourself")],
+        "price_model": "per_item", "typical_tier": "moderate",
+    },
+    "electrician": {
+        "label": "Electricians", "singular": "Electrician",
+        "tags": [("craft", "electrician")],
+        "price_model": "per_service", "typical_tier": "moderate",
+    },
+    "plumber": {
+        "label": "Plumbers", "singular": "Plumber",
+        "tags": [("craft", "plumber")],
+        "price_model": "per_service", "typical_tier": "moderate",
+    },
+    "carpenter": {
+        "label": "Carpenters", "singular": "Carpenter",
+        "tags": [("craft", "carpenter")],
+        "price_model": "per_service", "typical_tier": "moderate",
+    },
+    "painter": {
+        "label": "Painters & decorators", "singular": "Painter",
+        "tags": [("craft", "painter")],
+        "price_model": "per_service", "typical_tier": "moderate",
+    },
+    "roofer": {
+        "label": "Roofers", "singular": "Roofer",
+        "tags": [("craft", "roofer")],
+        "price_model": "per_service", "typical_tier": "moderate",
+    },
+    "interior_design": {
+        "label": "Interior design", "singular": "Interior designer",
+        "tags": [("office", "architecture"), ("craft", "interior_designer")],
+        "price_model": "per_service", "typical_tier": "expensive",
+    },
+    "cleaning": {
+        "label": "Cleaning services", "singular": "Cleaning service",
+        "tags": [("office", "cleaning"), ("craft", "cleaning"),
+                 ("shop", "laundry")],
+        "price_model": "per_service", "typical_tier": "budget",
+    },
+    "security_services": {
+        "label": "Security & locksmiths", "singular": "Security service",
+        "tags": [("craft", "locksmith"), ("shop", "security"),
+                 ("office", "security")],
+        "price_model": "per_service", "typical_tier": "moderate",
+    },
+
+    # ── Technology & digital services ──
+    "it_services": {
+        "label": "IT & web services", "singular": "IT service company",
+        "tags": [("office", "it"), ("office", "telecommunication"),
+                 ("office", "software")],
+        "price_model": "per_service", "typical_tier": "moderate",
+    },
+    "photography": {
+        "label": "Photographers & studios", "singular": "Photographer",
+        "tags": [("craft", "photographer"), ("shop", "photo")],
+        "price_model": "per_service", "typical_tier": "moderate",
+    },
+
+    # ── Automotive ──
+    "auto_parts": {
+        "label": "Auto parts & tyres", "singular": "Auto parts store",
+        "tags": [("shop", "car_parts"), ("shop", "tyres"), ("shop", "tyres")],
+        "price_model": "per_item", "typical_tier": "moderate",
+    },
+    "bus_station": {
+        "label": "Bus stations", "singular": "Bus station",
+        "tags": [("amenity", "bus_station")],
+        "price_model": "entry_fee", "typical_tier": "budget",
+    },
+    "taxi": {
+        "label": "Taxi services", "singular": "Taxi service",
+        "tags": [("amenity", "taxi")],
+        "price_model": "per_service", "typical_tier": "moderate",
+    },
+
+    # ── Other services ──
+    "pet_shop": {
+        "label": "Pet shops", "singular": "Pet shop",
+        "tags": [("shop", "pet"), ("shop", "pet_grooming")],
+        "price_model": "per_item", "typical_tier": "budget",
+    },
+    "gaming": {
+        "label": "Gaming & arcades", "singular": "Gaming centre",
+        "tags": [("leisure", "bowling_alley"), ("amenity", "gambling"),
+                 ("shop", "video_games"), ("leisure", "escape_game")],
+        "price_model": "entry_fee", "typical_tier": "budget",
     },
 }
 
